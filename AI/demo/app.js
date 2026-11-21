@@ -1,3 +1,5 @@
+import { showActivityModel } from './activity.js'
+
 const form = document.querySelector('#prompt-form')
 const promptInput = document.querySelector('#prompt')
 const submit = form.querySelector('button')
@@ -77,6 +79,7 @@ async function showModelDetails() {
     if (!response.ok) throw new Error('Could not load model metadata.')
     const { models } = await response.json()
     const model = models.find(item => item.task === 'prompt_content')
+    showActivityModel(models.find(item => item.task === 'editor_activity'))
     const { evaluation } = model
     modelStatus.textContent = model.available ? model.meaning : 'The prompt model is currently unavailable.'
     if (!evaluation) return

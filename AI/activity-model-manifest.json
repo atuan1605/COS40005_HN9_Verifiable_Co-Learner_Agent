@@ -1,0 +1,33 @@
+{
+  "task": "editor_activity",
+  "modelVersion": "editor-activity-v1",
+  "featureVersion": "editor-window-v1",
+  "featureDescription": "Edit count, active bins, longest edit pause, correction fraction and paste count",
+  "featureNames": [
+    "edit_events",
+    "active_edit_bins",
+    "longest_edit_pause_seconds",
+    "correction_fraction",
+    "paste_events"
+  ],
+  "formatVersion": 1,
+  "artifact": "keystroke-activity-model.npz",
+  "sha256": "7a0ba0b639f8d545a75338c25189909cd8184a98aafe2d559d313b0d8d3a56c5",
+  "threshold": 0.5,
+  "positiveLabel": "editing",
+  "negativeLabel": "other_activity",
+  "meaning": "Classifies an observed editor window using the editing label from simulated profiles. Reading and planning can happen during a quiet window.",
+  "evaluationStatus": "experimental",
+  "evaluation": {
+    "dataset": "Synthetic editor activity profiles",
+    "revision": "Simulator seed 42, held out by profile",
+    "holdoutCount": 720,
+    "heldOutProfiles": 24,
+    "positiveCount": 288,
+    "averagePrecision": 0.915,
+    "precision": 0.855,
+    "recall": 0.778,
+    "f1": 0.815,
+    "threeActiveBinsF1": 0.770
+  }
+}

@@ -62,7 +62,7 @@ class PromptApiTests(unittest.TestCase):
     def test_model_information_exposes_evaluation_provenance(self):
         base = self.start_server()
         with urlopen(f"{base}/api/models", timeout=5) as response:
-            [model] = json.load(response)["models"]
+            model = next(model for model in json.load(response)["models"] if model["task"] == "prompt_content")
         self.assertTrue(model["available"])
         self.assertEqual(model["language"], "en")
         self.assertEqual(model["evaluationStatus"], "experimental")
