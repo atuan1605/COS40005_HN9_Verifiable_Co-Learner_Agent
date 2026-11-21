@@ -74,6 +74,21 @@ class ActivityApiTests(unittest.TestCase):
                 self.assertNotIn("score", result)
                 self.assertNotIn("label", result)
 
+    def test_paste_and_edit_pause_match_the_research_features(self):
+        base = self.start_server()
+        quiet = [[0, 0, 0]] * 23
+        cases = (
+            # [0, 0, 120, 0, 1]: one late paste still leaves 120 seconds without edits.
+            (quiet + [[0, 0, 1]], 0.013807755593223432),
+            # [1, 1, 115, 0, 0]: one early edit followed by a 115-second edit pause.
+            ([[1, 0, 0]] + quiet, 0.1142014530302709),
+        )
+        for bins, score in cases:
+            with self.subTest(score=score):
+                with urlopen(self.activity_request(base, bins), timeout=5) as response:
+                    result = json.load(response)
+                self.assertAlmostEqual(result["score"], score, places=10)
+
     def test_rejects_malformed_counts_and_windows(self):
         base = self.start_server()
         quiet = [[0, 0, 0]] * 24
