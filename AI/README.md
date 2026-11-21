@@ -1,6 +1,6 @@
 # Local ML demo and research
 
-## Run the English prompt demo
+## Run the local demo
 
 From the repository root, use Python 3.13 in an activated virtual environment:
 
@@ -13,6 +13,21 @@ Open [the local demo](http://127.0.0.1:8765). Enter an English prompt and choose
 
 The process loads the committed numeric export using the task and SHA-256 in the manifest. It starts from CPU parameters already trained offline. Serving requires no training, dataset download, model provider or application credentials. Requests remain on loopback. The service neither logs submitted text nor stores inputs. If the port is in use, run `python AI/serve-models.py --port 8766` and open the printed address.
 
+### Classify editor activity
+
+Choose **Start live observation**, then type, delete or paste in the demo editor. After two minutes, choose **Classify activity**. The request uses the latest 24 complete five-second bins. **Reset observation** clears the counts and restarts the clock. Switching away from the tab discards the observation to preserve complete coverage. Choose a labelled **Synthetic sample** to try a complete window immediately.
+
+| Operation in the demo editor | Counts |
+|---|---|
+| Committed insertion or deletion | One edit per inserted or removed span. A removal also counts as one correction. |
+| Selected text replaced by different text | One insertion and one removal. The removal counts as a correction. |
+| Paste | One paste. Selection replacement within that paste shares the same count. |
+| IME composition | One committed change when composition ends. Intermediate input stays outside the counts. |
+| Undo or redo | The committed change follows the insertion and removal rules. |
+| Cursor movement, selection and sample load | No live edit. |
+
+Activity classification sends counts for each bin. Source text stays in the demo editor's page memory. The model uses total edits, the number of bins with edits, the longest streak of edit-free bins in seconds, corrections divided by total edits and total pastes. The labels describe patterns in the simulated activity dataset. A quiet window can include learning activities such as reading or planning.
+
 ### API
 
 Send `POST /api/classify/prompt` with `Content-Type: application/json` and a JSON object:
@@ -21,14 +36,30 @@ Send `POST /api/classify/prompt` with `Content-Type: application/json` and a JSO
 {"prompt":"Why does my Python loop skip an item?","language":"en"}
 ```
 
-The service uses `language` as the caller's declaration. It accepts up to 4,000 characters per prompt and 64 KiB per request. A successful response contains the task, label, score, threshold, model and feature versions, experimental status and input source. `GET /api/models` returns metadata and model availability.
+The service uses `language` as the caller's declaration. It accepts up to 4,000 characters per prompt and 64 KiB per request. A successful response contains the task, label, score, threshold, model and feature versions, experimental status and input source. `GET /api/models` returns metadata and availability for both models.
+
+Send `POST /api/classify/activity` with an aggregate window. This example shows a partially observed window:
+
+```json
+{
+  "source": "live",
+  "window": {
+    "featureVersion": "editor-window-v1",
+    "binSeconds": 5,
+    "observedSeconds": 5,
+    "bins": [[2, 1, 0]]
+  }
+}
+```
+
+For a complete window use 120 seconds and 24 bins ordered oldest first. Each bin is `[edits, corrections, pastes]`. Counts are integers between 0 and 10,000. Corrections count as edits. A partial window supplies one bin per five seconds observed, rounding up to include a partial bin. Valid partial windows return `insufficient_history` with status `unavailable`. A complete window with zero edits remains scoreable.
 
 | Situation | Response |
 |---|---|
 | Invalid JSON or unexpected request fields | 400 with an error code and message |
 | Missing content length or body over 64 KiB | 411 or 413 |
 | Non-JSON content type | 415 |
-| Blank or overlong prompt, or a language other than English | 422 |
+| Blank or overlong prompt, unsupported language, or invalid editor window | 422 |
 | Missing, changed or incompatible model export | 503 with `model_unavailable` |
 
 ### Verify the demo
@@ -43,6 +74,7 @@ pnpm exec playwright test --config playwright.ml.config.ts
 ```
 
 The browser suite starts its own local inference process on port 8765. Stop a running demo on that port before running the suite.
+It covers live counts, paste, reset and the composition event sequence. For a manual IME check, start a live observation and enter one committed word using your system IME. Confirm the counter increments on commit.
 
 ## Offline self-harm content experiment
 

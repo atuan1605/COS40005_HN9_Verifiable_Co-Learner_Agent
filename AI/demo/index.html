@@ -12,7 +12,7 @@
     <header class="intro">
       <p class="project">Verifiable Co-Learner</p>
       <h1>ML Lab</h1>
-      <p>Try the experimental prompt classifier with an English example. Inference runs on this machine.</p>
+      <p>Try the experimental English prompt and editor activity classifiers. Inference runs on this machine.</p>
     </header>
     <section class="panel" aria-labelledby="prompt-heading">
       <h2 id="prompt-heading">Prompt classification</h2>
@@ -24,6 +24,34 @@
         <button type="submit">Classify prompt</button>
       </form>
       <div id="prompt-result" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+    </section>
+    <section class="panel" aria-labelledby="activity-heading">
+      <h2 id="activity-heading">Editor activity classification</h2>
+      <p class="help">Type, delete or paste during a two-minute observation. The model receives aggregate counts.</p>
+      <div class="activity-controls">
+        <button id="start-observation" type="button">Start live observation</button>
+        <button id="reset-observation" type="button" disabled>Reset observation</button>
+      </div>
+      <div class="activity-input">
+        <label for="activity-editor">Demo editor</label>
+        <textarea id="activity-editor" rows="4" maxlength="16000" spellcheck="false" autocomplete="off" disabled></textarea>
+      </div>
+      <div class="activity-sample">
+        <label for="activity-sample">Load a synthetic sample</label>
+        <select id="activity-sample">
+          <option value="">Choose a sample</option>
+          <option value="editing">Sustained edits</option>
+          <option value="quiet">Quiet window</option>
+        </select>
+      </div>
+      <p id="observation-progress" class="help" aria-live="off"></p>
+      <p id="observation-counts" class="help"></p>
+      <button id="classify-activity" type="button" disabled>Classify activity</button>
+      <div id="activity-result" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+      <details class="activity-model">
+        <summary>Editor model evaluation</summary>
+        <p id="activity-model-details">Loading model information…</p>
+      </details>
     </section>
     <details class="panel">
       <summary>Model details</summary>

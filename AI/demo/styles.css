@@ -54,7 +54,7 @@ details p { margin-block-start: .8rem; }
 dl { display: grid; gap: .75rem; margin: .75rem 0 0; }
 details dl { grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
 dd { margin: 0; overflow-wrap: anywhere; }
-#prompt-result {
+#prompt-result, #activity-result {
   margin-block-start: 1rem;
   border: 1px solid var(--color-brand-200);
   background: var(--color-brand-50);
@@ -64,3 +64,17 @@ dd { margin: 0; overflow-wrap: anywhere; }
 #prompt-result[data-kind="error"] { font-weight: 600; }
 #prompt-result dl { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); }
 .result-label { font-size: 1.1rem; font-weight: 650; }
+.activity-controls { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
+.activity-input, .activity-sample { display: grid; gap: .4rem; margin-block: .75rem; }
+.activity-input textarea { font-family: ui-monospace, monospace; }
+.activity-sample select {
+  justify-self: start;
+  max-width: 100%;
+  padding: .5rem;
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--color-brand-500);
+  border-radius: .5rem;
+  background-color: var(--color-paper);
+}
+.activity-model { margin-block-start: .85rem; }

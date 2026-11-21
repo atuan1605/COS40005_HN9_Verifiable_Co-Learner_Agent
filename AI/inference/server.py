@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import re
 
-from .artifacts import AI_ROOT, MANIFEST_PATH
+from .artifacts import ACTIVITY_MANIFEST_PATH, AI_ROOT, MANIFEST_PATH
 from .service import ApiError, InferenceService
 
 
@@ -11,9 +11,12 @@ MAX_BODY_BYTES = 65_536
 ASSETS = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/activity.js": ("activity.js", "text/javascript; charset=utf-8"),
+    "/collector.js": ("collector.js", "text/javascript; charset=utf-8"),
     "/styles.css": ("styles.css", "text/css; charset=utf-8"),
 }
 PROMPT_ROUTE = "/api/classify/prompt"
+ACTIVITY_ROUTE = "/api/classify/activity"
 MODELS_ROUTE = "/api/models"
 
 
@@ -48,8 +51,13 @@ def create_server(
     *,
     model_dir: Path = AI_ROOT,
     manifest_path: Path = MANIFEST_PATH,
+    activity_manifest_path: Path = ACTIVITY_MANIFEST_PATH,
 ) -> ThreadingHTTPServer:
-    service = InferenceService.load(model_dir, manifest_path)
+    service = InferenceService.load(model_dir, manifest_path, activity_manifest_path)
+    post_routes = {
+        PROMPT_ROUTE: service.classify_prompt,
+        ACTIVITY_ROUTE: service.classify_activity,
+    }
     assets = demo_assets()
 
     class Handler(BaseHTTPRequestHandler):
@@ -80,14 +88,14 @@ def create_server(
                     raise ApiError(403, "invalid_host", "Open the demo using its printed loopback address.")
                 if method == "POST" and self.headers.get_all("Origin") not in (None, [origin]):
                     raise ApiError(403, "invalid_origin", "Send the request from the local demo.")
-                if self.path == PROMPT_ROUTE and method == "POST":
-                    self.json_response(200, service.classify_prompt(self.read_json()))
+                if self.path in post_routes and method == "POST":
+                    self.json_response(200, post_routes[self.path](self.read_json()))
                 elif self.path == MODELS_ROUTE and method == "GET":
                     self.json_response(200, service.models())
                 elif self.path in assets and method == "GET":
                     content_type, body = assets[self.path]
                     self.respond(200, content_type, body)
-                elif self.path in assets or self.path in (PROMPT_ROUTE, MODELS_ROUTE):
+                elif self.path in assets or self.path in post_routes or self.path == MODELS_ROUTE:
                     raise ApiError(405, "method_not_allowed", "Use the documented method for this route.")
                 else:
                     raise ApiError(404, "not_found", "This route does not exist.")
@@ -134,7 +142,7 @@ def create_server(
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             if status == 405:
-                self.send_header("Allow", "POST" if self.path == PROMPT_ROUTE else "GET")
+                self.send_header("Allow", "POST" if self.path in post_routes else "GET")
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Content-Security-Policy", "default-src 'self'; base-uri 'none'; frame-ancestors 'none'")
             self.end_headers()
