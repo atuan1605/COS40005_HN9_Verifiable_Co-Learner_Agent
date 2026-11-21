@@ -97,6 +97,7 @@ async function showModelDetails() {
   }
   catch {
     modelStatus.textContent = 'Could not load model details. Refresh to try again.'
+    showActivityModel()
   }
 }
 

@@ -109,12 +109,14 @@ class ActivityApiTests(unittest.TestCase):
                 model_dir / "keystroke-activity-model.npz",
             )
             base = self.start_server(model_dir=model_dir)
-            request = self.activity_request(base, [[2, 1, 0]] * 24)
-            with self.assertRaises(HTTPError) as failure:
-                urlopen(request, timeout=5)
-            with failure.exception as response:
-                self.assertEqual(response.status, 503)
-                self.assertEqual(json.load(response)["error"]["code"], "model_unavailable")
+            for seconds, bins in ((0, []), (120, [[2, 1, 0]] * 24)):
+                request = self.activity_request(base, bins, seconds=seconds, source="live")
+                with self.subTest(seconds=seconds):
+                    with self.assertRaises(HTTPError) as failure:
+                        urlopen(request, timeout=5)
+                    with failure.exception as response:
+                        self.assertEqual(response.status, 503)
+                        self.assertEqual(json.load(response)["error"]["code"], "model_unavailable")
             with urlopen(f"{base}/api/models", timeout=5) as response:
                 model = next(model for model in json.load(response)["models"] if model["task"] == "editor_activity")
                 self.assertFalse(model["available"])

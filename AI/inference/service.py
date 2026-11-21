@@ -61,6 +61,8 @@ class InferenceService:
             window = read_editor_window(data)
         except ValueError as error:
             raise ApiError(422, "invalid_window", str(error)) from None
+        if self.activity_model is None:
+            raise ApiError(503, "model_unavailable", "The editor model is unavailable. Check the model export and restart.")
         if not window.complete:
             return {
                 "status": "unavailable",
@@ -71,8 +73,6 @@ class InferenceService:
                 "reason": "insufficient_history",
                 "message": "Observe a full two minutes before classifying activity.",
             }
-        if self.activity_model is None:
-            raise ApiError(503, "model_unavailable", "The editor model is unavailable. Check the model export and restart.")
         return scored_result(
             self.activity_metadata,
             float(self.activity_model.score(window.features())[0]),

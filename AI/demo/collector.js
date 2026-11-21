@@ -45,21 +45,32 @@ export function completeWindow(bins) {
 export function countEditorChanges(editor, onCounts) {
   let committed = editor.value
   let composing = false
+  let replacedSelection = false
 
   function commit(inputType) {
     const next = editor.value
+    const replaced = replacedSelection
+    replacedSelection = false
     if (inputType === 'insertFromPaste') {
       committed = next
       onCounts([0, 0, 1])
       return
     }
     if (next === committed) return
-    const changes = countChange(committed, next)
+    const changes = replaced ? [2, 1, 0] : countChange(committed, next)
     committed = next
     onCounts(changes)
   }
 
-  editor.addEventListener('compositionstart', () => { composing = true })
+  editor.addEventListener('beforeinput', (event) => {
+    if (!composing && !event.isComposing) {
+      replacedSelection = event.inputType.startsWith('insert') && hasSelection()
+    }
+  })
+  editor.addEventListener('compositionstart', () => {
+    composing = true
+    replacedSelection = hasSelection()
+  })
   editor.addEventListener('compositionend', () => {
     composing = false
     commit('composition')
@@ -70,6 +81,11 @@ export function countEditorChanges(editor, onCounts) {
   return () => {
     committed = editor.value
     composing = false
+    replacedSelection = false
+  }
+
+  function hasSelection() {
+    return editor.selectionStart !== editor.selectionEnd
   }
 }
 

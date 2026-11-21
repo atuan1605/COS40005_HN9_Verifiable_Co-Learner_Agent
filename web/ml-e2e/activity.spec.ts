@@ -126,6 +126,10 @@ test('starts a fresh observation after a visibility gap', async ({ page }) => {
   await editor.press('Control+z')
   await expect(editor).toHaveValue('')
   await expect(panel.getByText('Edits: 2 · Corrections: 1 · Pastes: 0')).toBeVisible()
+  await editor.press('a')
+  await editor.press('Control+a')
+  await page.keyboard.insertText('ab')
+  await expect(panel.getByText('Edits: 5 · Corrections: 2 · Pastes: 0')).toBeVisible()
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, value: true })
     document.dispatchEvent(new Event('visibilitychange'))

@@ -26,7 +26,7 @@ Choose **Start live observation**, then type, delete or paste in the demo editor
 | Undo or redo | The committed change follows the insertion and removal rules. |
 | Cursor movement, selection and sample load | No live edit. |
 
-Activity classification sends counts for each bin. Source text stays in the demo editor's page memory. The model computes edit count, active edit bins, longest edit pause, correction fraction and paste count from those bins. The labels describe patterns in the simulated activity dataset. A quiet window can include learning activities such as reading or planning.
+Activity classification sends counts for each bin. Source text stays in the demo editor's page memory. The model uses total edits, the number of bins with edits, the longest streak of edit-free bins in seconds, corrections divided by total edits and total pastes. The labels describe patterns in the simulated activity dataset. A quiet window can include learning activities such as reading or planning.
 
 ### API
 

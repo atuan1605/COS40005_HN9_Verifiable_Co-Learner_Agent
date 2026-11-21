@@ -53,7 +53,7 @@ function renderObservation() {
     totals.textContent = `Edits: ${edits} · Corrections: ${corrections} · Pastes: ${pastes}`
   }
   else totals.textContent = ''
-  classify.disabled = pending || !activeWindow()
+  classify.disabled = pending || !(sample || live?.window)
   editor.disabled = !observation
   reset.disabled = !observation
 }
@@ -146,8 +146,9 @@ export function showActivityModel(model) {
     return
   }
   const { evaluation } = model
+  const availability = model.available ? '' : 'The editor model is currently unavailable. '
   modelDetails.textContent =
-    `${model.meaning} Evaluation used ${evaluation.holdoutCount} windows from ${evaluation.heldOutProfiles} held-out synthetic profiles. F1 ${evaluation.f1} (three-active-bin baseline ${evaluation.threeActiveBinsF1}).`
+    `${availability}${model.meaning} Features: ${model.featureDescription}. Evaluation used ${evaluation.holdoutCount} windows from ${evaluation.heldOutProfiles} held-out synthetic profiles. F1 ${evaluation.f1} (three-active-bin baseline ${evaluation.threeActiveBinsF1}).`
 }
 
 renderObservation()
