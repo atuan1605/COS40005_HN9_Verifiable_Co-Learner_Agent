@@ -12,7 +12,7 @@
     <header class="intro">
       <p class="project">Verifiable Co-Learner</p>
       <h1>ML Lab</h1>
-      <p>Try the experimental English prompt and editor activity classifiers. Inference runs on this machine.</p>
+      <p>Try prompt classification, editor activity classification and a first-submission forecast. Inference runs on this machine.</p>
     </header>
     <section class="panel" aria-labelledby="prompt-heading">
       <h2 id="prompt-heading">Prompt classification</h2>
@@ -51,6 +51,16 @@
       <details class="activity-model">
         <summary>Editor model evaluation</summary>
         <p id="activity-model-details">Loading model information…</p>
+      </details>
+    </section>
+    <section class="panel" aria-labelledby="forecast-heading">
+      <h2 id="forecast-heading">First-submission forecast</h2>
+      <p class="help">Classify an editor window above to see the forecast for the first recorded submission in the next ten minutes.</p>
+      <div id="forecast-result" aria-live="polite" aria-atomic="true">Start an observation or choose a sample.</div>
+      <button id="mark-submitted" type="button" disabled>Mark demo exercise submitted</button>
+      <details class="activity-model">
+        <summary>Submission model evaluation</summary>
+        <p id="forecast-model-details">Loading model information…</p>
       </details>
     </section>
     <details class="panel">

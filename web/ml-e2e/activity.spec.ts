@@ -67,7 +67,9 @@ test('sends aggregate live edits, replacement, paste and one IME commit after tw
   await expect(panel.getByText('Edits: 6 · Corrections: 2 · Pastes: 1')).toBeVisible()
   await page.clock.runFor(114750)
   await expect(classify).toBeDisabled()
+  await expect(page.getByText('Observe a full two minutes before forecasting.')).toBeVisible()
   await page.clock.runFor(250)
+  await expect(page.getByText('Classify activity to see the forecast for this window.')).toBeVisible()
   const sent = await readActivityRequest(page)
   expect(sent).toEqual({
     source: 'live',

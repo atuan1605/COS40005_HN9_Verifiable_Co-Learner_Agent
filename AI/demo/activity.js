@@ -9,6 +9,9 @@ const progress = document.querySelector('#observation-progress')
 const totals = document.querySelector('#observation-counts')
 const result = document.querySelector('#activity-result')
 const modelDetails = document.querySelector('#activity-model-details')
+const markSubmitted = document.querySelector('#mark-submitted')
+const forecastResult = document.querySelector('#forecast-result')
+const forecastDetails = document.querySelector('#forecast-model-details')
 
 const samples = {
   editing: { label: 'Sustained edits', bins: Array.from({ length: WINDOW_BINS }, () => [2, 1, 0]) },
@@ -18,6 +21,8 @@ const samples = {
 let observation = null
 let revision = 0
 let pending = false
+let alreadySubmitted = false
+let awaitingForecast = true
 let notice = 'Start an observation or choose a sample.'
 
 const syncEditor = countEditorChanges(editor, (changes) => {
@@ -55,14 +60,27 @@ function renderObservation() {
   else totals.textContent = ''
   classify.disabled = pending || !(sample || live?.window)
   editor.disabled = !observation
-  reset.disabled = !observation
+  reset.disabled = !(observation || sample || alreadySubmitted)
+  markSubmitted.disabled = alreadySubmitted || !(observation || sample)
+  if (awaitingForecast && !alreadySubmitted) {
+    const message = forecastPrompt(sample || live?.window, live)
+    if (forecastResult.textContent !== message) forecastResult.textContent = message
+  }
+}
+
+function forecastPrompt(complete, live) {
+  if (complete) return 'Classify activity to see the forecast for this window.'
+  if (live) return 'Observe a full two minutes before forecasting.'
+  return 'Start an observation or choose a sample.'
 }
 
 function clearResult() {
   revision++
   pending = false
+  awaitingForecast = true
   result.hidden = true
   result.textContent = ''
+  forecastResult.textContent = alreadySubmitted ? 'This demo exercise already has a submission.' : ''
 }
 
 function startObservation() {
@@ -76,7 +94,15 @@ function startObservation() {
 }
 
 start.addEventListener('click', startObservation)
-reset.addEventListener('click', startObservation)
+reset.addEventListener('click', () => {
+  alreadySubmitted = false
+  startObservation()
+})
+markSubmitted.addEventListener('click', () => {
+  alreadySubmitted = true
+  forecastResult.textContent = 'This demo exercise already has a submission.'
+  renderObservation()
+})
 sampleSelect.addEventListener('change', () => {
   observation = null
   editor.value = ''
@@ -100,24 +126,20 @@ classify.addEventListener('click', async () => {
   const request = activeWindow()
   if (!request || pending) return
   const submittedRevision = revision
+  const submittedState = alreadySubmitted
   pending = true
+  awaitingForecast = false
   result.hidden = false
   result.textContent = 'Scoring editor activity…'
+  if (!submittedState) forecastResult.textContent = 'Preparing forecast…'
   renderObservation()
+
   try {
-    const response = await fetch('/api/classify/activity', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-    })
-    const data = await response.json()
-    if (submittedRevision !== revision) return
-    if (!response.ok) result.textContent = data.error.message
-    else if (data.status === 'unavailable') result.textContent = data.message
-    else showActivityScore(data)
-  }
-  catch {
-    if (submittedRevision === revision) result.textContent = 'Could not reach the local editor model. Try again.'
+    await Promise.all([
+      showInference('/api/classify/activity', request, result, showActivityScore, () => submittedRevision === revision),
+      showInference('/api/predict/submission', { ...request, alreadySubmitted: submittedState }, forecastResult,
+        showForecastScore, () => submittedRevision === revision && submittedState === alreadySubmitted),
+    ])
   }
   finally {
     if (submittedRevision === revision) {
@@ -127,8 +149,37 @@ classify.addEventListener('click', async () => {
   }
 })
 
+async function showInference(path, request, target, showScore, isCurrent) {
+  try {
+    const response = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    })
+    const data = await response.json()
+    if (!isCurrent()) return
+    if (!response.ok) target.textContent = data.error.message
+    else if (data.status === 'unavailable') target.textContent = data.message
+    else showScore(data)
+  }
+  catch {
+    if (isCurrent()) target.textContent = 'Could not get a result from the local model. Try again.'
+  }
+}
+
 function showActivityScore(data) {
   const label = data.label === 'editing' ? 'Editing pattern' : 'Other activity pattern'
+  renderScore(result, label, data)
+}
+
+function showForecastScore(data) {
+  const label = data.label === 'submission_within_10_minutes'
+    ? 'Forecast: first submission within 10 minutes'
+    : 'Forecast: below the 10-minute submission threshold'
+  renderScore(forecastResult, label, data)
+}
+
+function renderScore(target, label, data) {
   const source = data.source === 'live' ? 'Live observation' : 'Synthetic sample'
   const heading = document.createElement('p')
   heading.className = 'result-label'
@@ -137,7 +188,7 @@ function showActivityScore(data) {
   info.textContent = `Model score ${data.score.toFixed(4)} · Threshold ${data.threshold.toFixed(4)}`
   const versions = document.createElement('p')
   versions.textContent = `${data.modelVersion} · ${data.featureVersion}`
-  result.replaceChildren(heading, info, versions)
+  target.replaceChildren(heading, info, versions)
 }
 
 export function showActivityModel(model) {
@@ -149,6 +200,19 @@ export function showActivityModel(model) {
   const availability = model.available ? '' : 'The editor model is currently unavailable. '
   modelDetails.textContent =
     `${availability}${model.meaning} Features: ${model.featureDescription}. Evaluation used ${evaluation.holdoutCount} windows from ${evaluation.heldOutProfiles} held-out synthetic profiles. F1 ${evaluation.f1} (three-active-bin baseline ${evaluation.threeActiveBinsF1}).`
+}
+
+export function showForecastModel(model) {
+  if (!model?.evaluation) {
+    forecastDetails.textContent = 'The submission model is currently unavailable.'
+    return
+  }
+  const { evaluation } = model
+  const availability = model.available ? '' : 'The submission model is currently unavailable. '
+  const baseline = evaluation.activeEditBinsAveragePrecision
+  const comparison = baseline > evaluation.averagePrecision ? 'higher, at ' : ''
+  forecastDetails.textContent =
+    `${availability}Experimental. ${model.meaning} On the historical CS1 holdout, average precision was ${evaluation.averagePrecision.toFixed(4)}. The simple active-bin baseline scored ${comparison}${baseline.toFixed(4)}.`
 }
 
 renderObservation()

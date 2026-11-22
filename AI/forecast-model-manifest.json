@@ -1,0 +1,36 @@
+{
+  "task": "first_submission",
+  "modelVersion": "first-submission-v1",
+  "featureVersion": "editor-window-v1",
+  "featureDescription": "Edit count, active bins, longest edit pause, correction fraction and paste count",
+  "featureNames": [
+    "edit_events",
+    "active_edit_bins",
+    "longest_edit_pause_seconds",
+    "correction_fraction",
+    "paste_events"
+  ],
+  "formatVersion": 1,
+  "artifact": "cs1-submission-model.npz",
+  "sha256": "eb842512300025e252411629ee888428903cb6e9c1a8f40f5451cb2341ba2ccf",
+  "threshold": 0.2317631072747051,
+  "horizonSeconds": 600,
+  "positiveLabel": "submission_within_10_minutes",
+  "negativeLabel": "no_submission_within_10_minutes",
+  "meaning": "Forecasts whether the same exercise receives its first recorded submission in the next ten minutes. That event records an assessment attempt.",
+  "evaluationStatus": "experimental",
+  "evaluation": {
+    "dataset": "IDE Action Log Dataset from a CS1 MOOC",
+    "revision": "Zenodo v1, grouped holdout by learner",
+    "holdoutCount": 4757,
+    "heldOutLearners": 8,
+    "positiveCount": 2005,
+    "averagePrecision": 0.491,
+    "activeEditBinsAveragePrecision": 0.5206,
+    "constantScoreAveragePrecision": 0.4215,
+    "precision": 0.4241,
+    "recall": 0.9581,
+    "f1": 0.5879,
+    "alwaysPositiveF1": 0.593
+  }
+}
