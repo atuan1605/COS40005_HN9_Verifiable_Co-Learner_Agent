@@ -71,7 +71,7 @@ export interface InjectionCaseEvent {
 }
 
 export type InjectionRunEvent =
-  | { type: 'start', totalCases: number, provider: InjectionRunProvider, model: string, startedAt: number }
+  | { type: 'start', totalCases: number, provider: InjectionRunProvider, model: string, startedAt: number, verifyShieldOn: boolean }
   | InjectionCaseEvent
   | { type: 'done', total: number, passed: number, leaked: number, stopped: 'complete' | 'budget', durationMs: number }
 

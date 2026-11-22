@@ -88,6 +88,7 @@ export async function* runInjectionSuite(
       provider: deps.provider,
       model: deps.model,
       startedAt,
+      verifyShieldOn: deps.verifyShieldOn,
     }
 
     while (next < cases.length || active > 0) {
