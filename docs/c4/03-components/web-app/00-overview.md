@@ -36,7 +36,7 @@ flowchart LR
   pages -->|"drafts/store, workspace/layout,<br/>sign-in/intro, activity/record,<br/>staff/landing"| helpers
   pages -->|"studentIdFromAuth,<br/>sessionStudentId"| shared
   pages ==>|"auto-registered"| home
-  pages ==>|"/turn, /api/student, /api/admin,<br/>/api/lecturer, /course-outline"| server
+  pages ==>|"/turn, /api/student, /api/admin,<br/>/api/admin/security-suite,<br/>/api/admin/security-run, /api/lecturer,<br/>/course-outline"| server
   ws -->|"drafts/store, mindmap/arrangement,<br/>workspace/chat-markdown"| helpers
   ws -->|"videoEmbed"| shared
   ws -->|"python/runner, dynamic<br/>python/browser-runner"| py
@@ -69,6 +69,7 @@ counted with the python runner component in [web-app/05-python-runner.md](05-pyt
 | From | To | What |
 |---|---|---|
 | pages (`index.vue`), ws (7 files, including `MaterialBlocks`), py (`protocol.ts`), helpers (`arrangement.ts`) | shared | `shared/turn.ts` types: `RedrawState`, `RoadmapModule`, `QuizQuestionView`, `MaterialBlock`, `ExerciseCheck`, ... |
+| pages (`admin/security.vue`) | shared | `shared/injection-suite.ts` types: `InjectionSuiteView`, `InjectionCaseEvent`, `InjectionRunEvent`, `InjectionAgent`, `InjectionRunProvider` |
 | ws (`ChatInline.vue`) | helpers | `InlineNode` from `workspace/chat-markdown.ts` |
 | py (`browser-runner.ts`) | py (`protocol.ts`) | `ToWorker`, `FromWorker` |
 

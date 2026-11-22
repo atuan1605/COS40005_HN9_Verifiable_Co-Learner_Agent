@@ -96,7 +96,7 @@ The student's choice on one quiz question, marked right or wrong by the server. 
 _Avoid_: response, quiz attempt
 
 **Test**:
-One automatic check of an exercise, comparing what the student's code returns for a given input with the expected value.
+One automatic check of an exercise, comparing what the student's code returns for a given input with the expected value. The word belongs to exercises only: one prompt in the injection suite is an Injection case and a run of that suite is a Cyber test run, never a Test.
 _Avoid_: assertion, test case
 
 **Misconception**:
@@ -268,6 +268,28 @@ _Avoid_: rule result, step
 **VerifyShield trace**:
 A panel, off by default, that shows the raw verdict for each turn, meant for assessors rather than students.
 _Avoid_: shield trace
+
+### Security testing
+
+**Injection case**:
+One adversarial prompt in the injection suite, addressed to the Teacher or Mai, kept with its attack family, the earlier turns it replays, and the fragments a reply must never contain. It is not a Test.
+_Avoid_: test case, attack prompt, probe
+
+**Injection suite**:
+The committed set of 120 injection cases grouped into eight attack families, each family with at least fifteen cases. It is validated as a whole when it loads, so a faulty case stops every run instead of being skipped.
+_Avoid_: test suite, prompt set, eval set
+
+**Cyber test run**:
+An administrator's run of the whole injection suite against the configured model, streamed case by case, with the VerifyShield state captured when it starts and passed to every case. It rules nothing and records nothing: a case leaks when the reply contains one of its forbidden fragments, and the results are shown once and never stored.
+_Avoid_: security test, audit run, scan
+
+**Leak**:
+A run result where an agent's reply contains the protected material the injection case tried to extract.
+_Avoid_: failure, breach, violation
+
+**Cyber Security page**:
+The administrator page that shows the injection suite by attack family, runs or cancels a Cyber test run with its score summary, and carries the VerifyShield switch, which is the same saved setting the Settings page reads and writes.
+_Avoid_: security dashboard, test console
 
 ### Architecture
 

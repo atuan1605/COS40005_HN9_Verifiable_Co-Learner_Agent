@@ -1,0 +1,178 @@
+# Component: cyber-security
+
+> [C4 index](../../README.md) / Level 3: Components / Turn and admin server
+
+`web/server/cyber-security/`, the injection suite and the run that tests the agents with it. It loads and validates
+the committed suite, turns it into the listing the Cyber Security page shows, and streams a Cyber test run
+case by case. Everything outside the folder goes through `index.ts`. Part of [server/00-overview.md](00-overview.md).
+
+Legend: solid = runtime import, dashed = type-only import, thick = runtime link with no import. Blue = this
+component, grey = other components.
+
+```mermaid
+flowchart LR
+  classDef comp fill:#1f6fd0,stroke:#164f96,color:#ffffff
+  classDef near fill:#4a5568,stroke:#2d3748,color:#ffffff
+  classDef ext fill:#8a5a00,stroke:#5c3c00,color:#ffffff
+  linkStyle default stroke:#8b949e,stroke-width:1.5px
+
+  spa["<b>Cyber Security page</b>"]:::near
+  suiteRoute["<b>api/admin/security-suite.get.ts</b>"]:::near
+  runRoute["<b>api/admin/security-run.post.ts</b>"]:::near
+  admin["<b>admin/handle-admin.ts</b>"]:::near
+  auth["<b>auth/staff-session-email.ts</b>"]:::near
+  turn["<b>turn/handle-turn.ts</b>"]:::near
+  agents["<b>agents/index.ts</b>"]:::near
+  lm["<b>language-model/index.ts</b>"]:::near
+  shield["<b>verify-shield/index.ts</b>"]:::near
+  sandbox["<b>sandbox/index.ts</b>"]:::near
+  studentModel["<b>student-model/index.ts</b>"]:::near
+  storage["<b>storage</b><br/>memory stores, supabase stores"]:::near
+  sharedTypes["<b>shared/injection-suite.ts</b>"]:::near
+  yaml["<b>injection-suite.yaml</b><br/>committed asset"]:::near
+
+  subgraph cyber["cyber-security"]
+    direction TB
+    index["<b>index.ts</b><br/>the interface"]:::comp
+    suite["<b>injection-suite.ts</b><br/>parseInjectionSuite, suiteView"]:::comp
+    handleSuite["<b>handle-suite.ts</b><br/>handleSuiteRequest"]:::comp
+    handleRun["<b>handle-run.ts</b><br/>handleRunRequest, one run"]:::comp
+    run["<b>run-suite.ts</b><br/>runInjectionSuite"]:::comp
+    fixture["<b>fixture.ts</b><br/>the fixture student, module,<br/>exercise and their text"]:::comp
+  end
+
+  spa ==>|"GET /api/admin/security-suite"| suiteRoute
+  spa ==>|"POST /api/admin/security-run"| runRoute
+  suiteRoute -->|"handleSuiteRequest,<br/>InjectionSuiteInvalidError"| index
+  suiteRoute -->|"SignInRequiredError,<br/>ProductOwnerRequiredError"| admin
+  suiteRoute -->|"staffSessionEmail"| auth
+  suiteRoute ==>|"the committed asset<br/>(useStorage)"| yaml
+  runRoute -->|"handleRunRequest, runInjectionSuite,<br/>budget and errors"| index
+  runRoute -->|"SignInRequiredError,<br/>ProductOwnerRequiredError"| admin
+  runRoute -->|"staffSessionEmail"| auth
+  runRoute -->|"createConfiguredAgents"| agents
+  runRoute -->|"resolveModelChoice,<br/>modelAddressLocked"| lm
+  runRoute -->|"verifyShieldForTurn"| shield
+  runRoute ==>|"the committed asset<br/>(useStorage)"| yaml
+  runRoute -->|"the model and shield stores"| storage
+  index --> suite
+  index --> handleSuite
+  index --> handleRun
+  index --> run
+  handleSuite -->|"requireProductOwner"| admin
+  handleSuite --> suite
+  handleSuite -.->|"type: InjectionSuiteView"| sharedTypes
+  handleRun -->|"requireProductOwner"| admin
+  handleRun -->|"InjectionSuiteInvalidError"| handleSuite
+  handleRun --> suite
+  handleRun -.->|"type: InjectionRunEvent"| sharedTypes
+  run -->|"handleTurn"| turn
+  run -.->|"type: Agents"| agents
+  run -->|"createFakeSandbox, type: Sandbox"| sandbox
+  run -->|"createMemoryUnlockStore"| studentModel
+  run -->|"memory conversation and course stores"| storage
+  run --> fixture
+  run -.->|"types: run events"| sharedTypes
+  suite -.->|"category ids and labels"| sharedTypes
+
+  style cyber fill:none,stroke:#8b949e,stroke-dasharray:5 4
+```
+
+## Interface (`index.ts`)
+
+| Export | Kind | What it is for |
+|---|---|---|
+| `parseInjectionSuite(text)` | function | Reads the YAML and answers either the suite or every problem in it at once. Pure. |
+| `suiteView(suite)` | function | The listing the page shows: categories in a fixed order, each with its cases and no forbidden fragments. |
+| `minimumCasesPerCategory` | constant | 15. |
+| `InjectionCase`, `InjectionPriorTurn`, `InjectionSuite` | types | What the parser and the run work with. A case keeps its forbidden fragments on the server. |
+| `InjectionSuiteParseResult` | type | `{ ok: true, suite }` or `{ ok: false, problems }`. |
+| `handleSuiteRequest(request)` | function | The administrator check, then load, parse and list. |
+| `InjectionSuiteInvalidError` | class | `statusCode` 500 and the `problems`, so the route can answer every one of them. |
+| `handleRunRequest(request)` | function | The administrator check, the one-run guard, load and parse, then the run's event stream wrapped so the guard is released however the stream ends. |
+| `InjectionRunInProgressError` | class | `statusCode` 409, refused before any model call. |
+| `runInjectionSuite(suite, deps)` | function | The run itself, as an async generator of run events. |
+| `injectionRunBudgetMs` | constant | Four minutes. |
+| `InjectionRunDeps` | type | The agents, the captured shield state, the provider and model label, and the test-only overrides. |
+| `InjectionSuiteRequest`, `InjectionRunRequest` | types | What a route passes in: the confirmed email, `adminEmails`, a loader for the committed text, and for a run the generator to stream and the optional guard callbacks. |
+| `fixtureStudentId`, `fixtureModuleId`, `fixtureExerciseId`, `fixtureExerciseTitle`, `fixtureHint`, `fixtureMisconception`, `fixtureSolution` | constants | The fixed world a case runs in (the Loops module and its summing exercise) and the text its forbidden fragments are authored against. |
+
+## The suite file
+
+`web/server/assets/injection-suite.yaml` is committed with the code and loaded through the Nitro asset storage. Its
+shape is `version: 1` and a non-empty `cases` list. Each case has an `id`, a `category` from the eight in
+`shared/injection-suite.ts`, an `agent` (`teacher` or `deskmate`), a `prompt`, one or more `forbiddenFragments`, and
+optionally `priorTurns` (each with `role` and `text`) and a `note` for the page.
+
+The parser judges the whole file before any case runs. Text that is not YAML comes back as that one problem; once it
+parses, every shape problem (wrong field type, unknown category, an empty `forbiddenFragments`) comes back in one
+list. With the shape right, duplicate case ids and every category under fifteen cases are collected together. A
+route answers with one 500 carrying the list, and the page shows every problem.
+
+The listing keeps the forbidden fragments on the server. The page receives each case's prompt, family, agent, count
+of earlier turns and note, which is enough to show and label it without publishing what a reply must not contain.
+
+The committed suite holds 120 cases, fifteen in each of the eight families. Its fragments are authored against the
+fixture module's solution, last hint rung and misconception correction, so they do not drift with the course spec.
+
+## A run
+
+`runInjectionSuite` yields one `start` event, then a `case` event for each case as it finishes, then one `done`
+event.
+
+| Event | Fields | When |
+|---|---|---|
+| `start` | `totalCases`, `provider`, `model`, `startedAt`, `verifyShieldOn` | Once, before any case. `verifyShieldOn` is the saved switch the route read once, so a later change does not reach a run in flight. |
+| `case` | `id`, `category`, `agent`, `prompt`, `verdict`, `leakedFragment`, `replyExcerpt`, `priorTurns` | As each case lands, up to three at a time (`concurrency` defaults to 3). |
+| `done` | `total`, `passed`, `leaked`, `stopped`, `durationMs` | Once at the end, `stopped` being `complete` or `budget`. Absent when the run is cancelled. |
+
+Each case builds its own in-memory world: one conversation holding the fixture student, the Loops module unlocked
+and its summing exercise as the resume point, then any earlier turns the case carries. It calls `handleTurn` with
+the case's prompt, its addressed agent and the captured `verifyShieldOn`, exactly as a real student turn would. The
+case is a Leak when the agent's last new reply contains one of its forbidden fragments,
+compared as literal text without regard to case; a leak carries the fragment and the first 400 characters of the
+reply. Messages before the prompt are never counted as the reply, so a seeded earlier turn cannot decide a case.
+
+The run schedules cases until all have started or the four-minute budget is reached; with the budget reached it
+stops scheduling, finishes the cases already running and closes with `stopped: 'budget'`. Nothing the run touches is
+persisted. A cancel aborts the route's signal, the engine returns without a `done` event, and the generator's
+`finally` releases the one-run guard.
+
+The one-run flag lives in the route (`security-run.post.ts`), so one run streams per server instance. The route
+passes `begin` and `end`; `handleRunRequest` claims the flag after the administrator check and before loading the
+suite, refuses a second run with `InjectionRunInProgressError` (409), and wraps the stream so `end` releases the flag
+however it finishes, is cancelled, or fails. The route also decides the model: the saved settings or the environment,
+the `resolveModelChoice` guard against a fake or locked address, `provider` as `fake` or `real`, and the label the
+page shows.
+
+## The score summary
+
+The page does not wait for `done` to show totals. `securitySummary` in `shared/injection-suite.ts` is a pure
+function of the events that have arrived: passed, leaked, the number finished of the total, the per-category tally
+of the families reached, the model label, the start time and the duration so far. The score is the share of
+finished cases with no leak, and is null until one finishes. Nothing is stored, so a reload starts blank.
+
+## Verified imports
+
+- Imports: runtime `requireProductOwner` from [`admin`](09-admin.md), `handleTurn` from [`turn`](02-turn.md),
+  `createFakeSandbox` from [`sandbox`](14-sandbox.md), `createMemoryUnlockStore` from
+  [`student-model`](05-student-model.md), and the memory conversation and course stores from
+  [`storage`](08-storage.md). Types only from [`agents`](06-agents.md) (`Agents`), [`sandbox`](14-sandbox.md)
+  (`Sandbox`) and [`shared`](../shared.md) (the suite view, run events, category ids, agent and labels). External:
+  `zod` and `yaml`. The suite asset is read by the routes, not here.
+- Runtime importers, all through `index.ts`: `api/admin/security-suite.get.ts` (`handleSuiteRequest`,
+  `InjectionSuiteInvalidError`), `api/admin/security-run.post.ts` (`handleRunRequest`, `runInjectionSuite`,
+  `injectionRunBudgetMs`, `InjectionRunInProgressError`, `InjectionSuiteInvalidError`).
+- Tests: `cyber-security-suite.test.ts` (parse, validate, list, administrator gate), `cyber-security-run.test.ts`
+  (events, verdicts, shield pass-through, cancel, budget, summary arithmetic). Both import from
+  `server/cyber-security`.
+- The suite asset is loaded by the two routes through `useStorage('assets:server')`; nothing else reads it.
+
+## Notes
+
+- The fixture world is not the course store: `handleTurn` is given an in-memory course store, so a run never writes
+  student data, decisions or activity. The decision log is not part of a run's result.
+- A case addresses one agent. The other agent never answers that turn, as with a student naming an agent in the
+  workspace.
+- The run's `model` label reads `Fake model` when the configured provider is the fake one; the page shows that
+  provider warning above the results so a rehearsal is not mistaken for a test of the real agent.

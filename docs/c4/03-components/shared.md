@@ -25,10 +25,13 @@ flowchart LR
     supabaseServer["<b>supabase-server.ts</b><br/>createRequestClient"]:::comp
     turnTypes["<b>turn.ts</b><br/>RedrawState and view types"]:::comp
     materials["<b>materials.ts</b><br/>materialsText, videoEmbed"]:::comp
+    injection["<b>injection-suite.ts</b><br/>categories, run events,<br/>securitySummary"]:::comp
   end
 
   prompts["<b>agents/prompts.ts</b>"]:::near
   video["<b>MaterialVideo.vue</b>"]:::near
+  cyber["<b>server/cyber-security</b>"]:::near
+  securityPage["<b>admin/security.vue</b>"]:::near
 
   routes -->|"sessionStudentId,<br/>sessionEmail"| studentId
   pagesmw -->|"studentIdFromAuth,<br/>sessionStudentId"| studentId
@@ -38,6 +41,9 @@ flowchart LR
   typeUsers -.->|"types"| turnTypes
   prompts -->|"materialsText"| materials
   video -->|"videoEmbed"| materials
+  cyber -->|"injectionCategoryIds,<br/>injectionCategoryLabels"| injection
+  securityPage -->|"securitySummary"| injection
+  securityPage -.->|"types"| injection
   materials -.->|"type: MaterialBlock,<br/>ModuleMaterials"| turnTypes
 
   style shared fill:none,stroke:#8b949e,stroke-dasharray:5 4
@@ -53,6 +59,7 @@ flowchart LR
 | `supabase-server.ts` | `createRequestClient(event, url, publishableKey)`: a Supabase server client that reads cookies from the request and writes refreshed ones to the response. |
 | `turn.ts` | The screen state (`RedrawState`), roadmap, working area, conversation, trace and the `TurnEvent` stream; `AddressedAgent`, `RuleCheck`, and the one runtime value `agentNames` (Teacher, Mai), the single agent-to-display-name map. `MaterialBlock` is one materials block: text, code, diagram, image or video. |
 | `materials.ts` | `materialsText` flattens a module's blocks for the Teacher prompt. `videoEmbed` returns a YouTube or Vimeo player address, or null so any other address stays a link. |
+| `injection-suite.ts` | The injection suite as both sides see it: the eight category ids and their labels, the case and listing types, the run event types, and `securitySummary`, which tallies a run's finished cases into a score. Forbidden fragments stay on the server. |
 
 ## Verified imports
 
@@ -62,6 +69,7 @@ flowchart LR
 - `agentNames` is imported at runtime by `app/workspace/addressed-agent` and `app/admin/decisions`; `AddressedAgent`/`RuleCheck` by `verify-shield/decide`, `storage/decision-log`, `storage/conversation-store`, `storage/supabase-decision-log`.
 - Type-only importers of `turn.ts`: `course/course`, `course/course-spec`, `course/materials`, `agents/contexts`, `turn/handle-turn`, `app/pages/index.vue`, seven workspace components (`ConversationPanel`, `CourseRoadmap`, `MaterialBlocks`, `PracticePanel`, `QuizPanel`, `MindmapCanvas`, `WorkingArea`), `app/python/protocol`, `app/mindmap/arrangement`. The browser files reach it through the Nuxt alias `#shared/turn`, `app/python/protocol` by relative path.
 - Runtime importers of `materials.ts`: `agents/prompts.ts` (`materialsText`) and `MaterialVideo.vue` (`videoEmbed`). `materials.test.ts` tests `videoEmbed` and `diagramTheme`.
+- Runtime importers of `injection-suite.ts`: `server/cyber-security/injection-suite.ts` (`injectionCategoryIds`, `injectionCategoryLabels`), `app/pages/admin/security.vue` (`securitySummary`, through `#shared/injection-suite`), and both cyber-security tests (`injectionCategoryIds`, and `securitySummary` in `cyber-security-run.test.ts`). Type-only importers: `server/cyber-security/handle-suite.ts`, `handle-run.ts` and `run-suite.ts`, `api/admin/security-run.post.ts`, and `security.vue` (the view and run event types). `index.ts` re-exports from `injection-suite.ts` and does not import `shared`; `fixture.ts` uses no shared type.
 - No test imports `student-id.ts` or `supabase-server.ts`. `mindmap-arrangement.test.ts` imports `turn.ts`.
 
 ## Notes

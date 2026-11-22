@@ -24,7 +24,7 @@ Components are ordered the way a request travels through them (server) or the wa
 | File | Component | One line |
 |---|---|---|
 | [00-overview.md](03-components/server/00-overview.md) | All server components | How the server components call each other |
-| [01-routes.md](03-components/server/01-routes.md) | routes | HTTP endpoints: `/turn`, `/api/student`, `/api/admin`, `/course-outline` |
+| [01-routes.md](03-components/server/01-routes.md) | routes | HTTP endpoints: `/turn`, `/api/student`, `/api/admin`, the security suite and run, `/course-outline` |
 | [02-turn.md](03-components/server/02-turn.md) | turn | Runs one turn from request to screen state |
 | [03-verify-shield.md](03-components/server/03-verify-shield.md) | verify-shield | VerifyShield: allow, block or downgrade each move, and the on/off switch |
 | [04-course.md](03-components/server/04-course.md) | course | Course modules, study content, roadmap |
@@ -40,6 +40,7 @@ Components are ordered the way a request travels through them (server) or the wa
 | [16-learning-pattern.md](03-components/server/16-learning-pattern.md) | learning pattern | Where the student's work says they struggle and how they study, one pure function of their records |
 | [17-learning-plan.md](03-components/server/17-learning-plan.md) | learning plan | The Teacher's one-to-five-step plan for a module, agreed by the student, kept as append-only revisions |
 | [18-study-suggestion.md](03-components/server/18-study-suggestion.md) | study suggestion | The one next step chosen by fixed rules from the student's activity log, and the memory of what they dismissed |
+| [19-cyber-security.md](03-components/server/19-cyber-security.md) | cyber-security | The injection suite, its validation, and the streamed run that tests the agents with it |
 
 ### Web app (`web/app/`)
 
@@ -71,10 +72,11 @@ Components are ordered the way a request travels through them (server) or the wa
 ## How the component diagrams were checked
 
 Level 3 relationships come from the real `import` statements in `web/server`, `web/shared`, `web/app`, `web/tests`
-and `web/e2e`: 229 imports inside the repo (204 relative and 25 through a Nuxt alias such as `#shared/turn` or
-`~/drafts/store`), 0 unresolved; 159 of them runtime and 70 type-only. Where there is no import, the link is drawn
-thick and the file that creates it is named in the component's "Verified" section. Each component file ends with the
-importers and tests found by that check.
+and `web/e2e`: 553 runtime imports inside the repo (496 relative and 57 through a Nuxt alias such as `#shared/turn` or
+`~/drafts/store`), 0 unresolved. Type-only imports are erased at build time, so each component's "Verified" section
+lists its type-only importers in a table instead of drawing them. Where there is no import, the link is drawn
+thick and the file that creates it is named in that section. Each component file ends with the importers and tests
+found by that check.
 
 ## Reading paths
 
