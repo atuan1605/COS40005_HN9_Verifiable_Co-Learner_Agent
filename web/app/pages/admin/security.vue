@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import AdminHeader from '~/components/admin/AdminHeader.vue'
-import type { InjectionAgent, InjectionSuiteView } from '#shared/injection-suite'
+import type { InjectionAgent, InjectionCaseEvent, InjectionRunEvent, InjectionRunProvider, InjectionSuiteView } from '#shared/injection-suite'
 
 definePageMeta({ middleware: 'signed-in' })
 useHead({ title: 'Cyber Security' })
@@ -22,6 +22,81 @@ const agentLabels: Record<InjectionAgent, string> = { teacher: 'Teacher', deskma
 
 function agentClass(agent: InjectionAgent): string {
   return agent === 'teacher' ? 'bg-brand-50 text-brand-700' : 'bg-amber-50 text-amber-800'
+}
+
+const running = ref(false)
+const provider = ref<InjectionRunProvider | null>(null)
+const cases = ref<InjectionCaseEvent[]>([])
+const stopped = ref<'complete' | 'budget' | null>(null)
+const runError = ref('')
+let controller: AbortController | null = null
+
+const passed = computed(() => cases.value.filter(item => item.verdict === 'pass').length)
+const leaked = computed(() => cases.value.filter(item => item.verdict === 'leak').length)
+
+async function startRun() {
+  if (running.value) return
+  runError.value = ''
+  provider.value = null
+  cases.value = []
+  stopped.value = null
+  const abort = new AbortController()
+  controller = abort
+  running.value = true
+  try {
+    const response = await fetch('/api/admin/security-run', { method: 'POST', signal: abort.signal })
+    if (!response.ok) {
+      runError.value = response.status === 409
+        ? 'A security run is already in progress.'
+        : response.status === 403
+          ? 'This page is for the administrator.'
+          : response.status === 500
+            ? 'The injection suite is invalid, so the run could not start.'
+            : 'The run could not start.'
+      return
+    }
+    if (!response.body) {
+      runError.value = 'The run could not start.'
+      return
+    }
+    await readEvents(response.body)
+  }
+  catch (error) {
+    if (!(error instanceof DOMException && error.name === 'AbortError')) {
+      runError.value = 'The run stopped before it finished.'
+    }
+  }
+  finally {
+    running.value = false
+    controller = null
+  }
+}
+
+async function readEvents(body: ReadableStream<Uint8Array>) {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    let newline = buffer.indexOf('\n')
+    while (newline >= 0) {
+      accept(JSON.parse(buffer.slice(0, newline)) as InjectionRunEvent)
+      buffer = buffer.slice(newline + 1)
+      newline = buffer.indexOf('\n')
+    }
+  }
+}
+
+function accept(event: InjectionRunEvent) {
+  if (event.type === 'start') provider.value = event.provider
+  else if (event.type === 'case') cases.value.push(event)
+  else stopped.value = event.stopped
+}
+
+function cancelRun() {
+  controller?.abort()
 }
 </script>
 
@@ -92,6 +167,85 @@ function agentClass(agent: InjectionAgent): string {
             </dd>
           </div>
         </dl>
+
+        <section class="flex flex-col gap-3 rounded-[8px] border border-ink-200 bg-default px-4 py-4 md:px-5">
+          <div class="flex flex-wrap items-center gap-3">
+            <UButton
+              v-if="!running"
+              type="button"
+              size="lg"
+              class="min-h-11 rounded-sm bg-accent text-on-accent px-4 py-2.5 text-sm font-medium shadow-xs hover:bg-accent-hover md:min-h-0"
+              @click="startRun"
+            >
+              Run the suite
+            </UButton>
+            <UButton
+              v-else
+              type="button"
+              size="lg"
+              color="neutral"
+              variant="outline"
+              class="min-h-11 rounded-sm px-4 py-2.5 text-sm font-medium md:min-h-0"
+              @click="cancelRun"
+            >
+              Cancel run
+            </UButton>
+            <p class="font-mono text-[11px] text-ink-500">
+              {{ cases.length }} of {{ data.totalCases }} cases
+            </p>
+            <p v-if="cases.length" class="font-mono text-[11px]">
+              <span class="text-emerald-700">{{ passed }} passed</span>
+              <span class="text-muted">, </span>
+              <span class="text-rose-700">{{ leaked }} leaked</span>
+            </p>
+            <p v-if="running" role="status" class="text-xs text-ink-500">
+              Running, results arrive case by case.
+            </p>
+            <p v-else-if="stopped === 'complete'" class="text-xs text-ink-500">
+              Run complete.
+            </p>
+            <p v-else-if="stopped === 'budget'" class="text-xs text-ink-500">
+              The run stopped at its time budget.
+            </p>
+          </div>
+          <p
+            v-if="provider === 'fake'"
+            role="status"
+            class="rounded-sm border border-amber-200 bg-amber-50 px-[13px] py-[11px] text-xs leading-[19.5px] text-amber-900"
+          >
+            The configured provider is the fake model. These results rehearse the run; they do not test a real agent.
+          </p>
+          <p
+            v-if="runError"
+            role="alert"
+            class="rounded-sm border border-rose-200/80 bg-rose-50 px-[13px] py-[11px] text-xs leading-[19.5px] text-rose-700"
+          >
+            {{ runError }}
+          </p>
+          <ol v-if="cases.length" class="flex flex-col gap-1.5">
+            <li
+              v-for="result in cases"
+              :key="result.id"
+              class="flex flex-wrap items-start gap-x-3 gap-y-1.5 rounded-[6px] border border-ink-200 bg-paper px-3 py-2"
+            >
+              <span class="min-w-0 flex-1 text-[13px] leading-5 text-ink-800">{{ result.prompt }}</span>
+              <span
+                class="shrink-0 rounded-[4px] px-1.5 py-0.5 text-[10px] leading-[15px] font-medium"
+                :class="agentClass(result.agent)"
+              >{{ agentLabels[result.agent] }}</span>
+              <span
+                class="shrink-0 rounded-[4px] px-1.5 py-0.5 text-[10px] leading-[15px] font-medium"
+                :class="result.verdict === 'leak' ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'"
+              >{{ result.verdict === 'leak' ? 'Leak' : 'Pass' }}</span>
+              <span v-if="result.leakedFragment" class="basis-full font-mono text-[11px] leading-5 text-rose-700">
+                leaked: {{ result.leakedFragment }}
+              </span>
+              <span v-if="result.replyExcerpt" class="basis-full text-[11px] leading-5 text-ink-500">
+                {{ result.replyExcerpt }}
+              </span>
+            </li>
+          </ol>
+        </section>
 
         <section
           v-for="category in data.categories"
