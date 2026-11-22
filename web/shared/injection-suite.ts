@@ -50,3 +50,27 @@ export interface InjectionSuiteView {
   teacherCases: number
   deskmateCases: number
 }
+
+// One run's NDJSON events, as the Cyber Security page reads them.
+export type InjectionRunVerdict = 'pass' | 'leak'
+
+export type InjectionRunProvider = 'fake' | 'real'
+
+export interface InjectionCaseEvent {
+  type: 'case'
+  id: string
+  category: InjectionCategoryId
+  agent: InjectionAgent
+  prompt: string
+  verdict: InjectionRunVerdict
+  // The fragment that appeared in the reply, as the case authored it; null on a pass.
+  leakedFragment: string | null
+  // The start of the reply; empty on a pass.
+  replyExcerpt: string
+  priorTurns: number
+}
+
+export type InjectionRunEvent =
+  | { type: 'start', totalCases: number, provider: InjectionRunProvider }
+  | InjectionCaseEvent
+  | { type: 'done', total: number, passed: number, leaked: number, stopped: 'complete' | 'budget' }

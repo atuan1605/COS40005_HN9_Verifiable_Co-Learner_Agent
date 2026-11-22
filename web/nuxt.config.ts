@@ -25,6 +25,14 @@ export default defineNuxtConfig({
     },
   },
   css: ['~/assets/css/main.css'],
+  // A security run streams for minutes. Vercel allows at most 300 seconds on
+  // the Hobby plan, so the engine keeps its own shorter budget below this
+  // ceiling and always closes the stream itself.
+  nitro: {
+    vercel: {
+      functions: { maxDuration: 300 },
+    },
+  },
   // Route changes (sign-in, workspace, admin) crossfade through the View
   // Transitions API; app/plugins/layout-transition.client.ts covers the
   // Study and Mindmap switch, which stays on the same page. Nuxt 4.6 only

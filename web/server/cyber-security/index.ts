@@ -1,4 +1,12 @@
-export { fixtureExerciseTitle, fixtureHint, fixtureMisconception, fixtureSolution } from './fixture'
+export {
+  fixtureExerciseId,
+  fixtureExerciseTitle,
+  fixtureHint,
+  fixtureMisconception,
+  fixtureModuleId,
+  fixtureSolution,
+  fixtureStudentId,
+} from './fixture'
 export {
   minimumCasesPerCategory,
   parseInjectionSuite,
@@ -13,3 +21,13 @@ export {
   InjectionSuiteInvalidError,
   type InjectionSuiteRequest,
 } from './handle-suite'
+export {
+  handleRunRequest,
+  InjectionRunInProgressError,
+  type InjectionRunRequest,
+} from './handle-run'
+export {
+  injectionRunBudgetMs,
+  runInjectionSuite,
+  type InjectionRunDeps,
+} from './run-suite'
