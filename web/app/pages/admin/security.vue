@@ -3,7 +3,7 @@ import AdminHeader from '~/components/admin/AdminHeader.vue'
 import BusySpinner from '~/components/BusySpinner.vue'
 import { messageFrom } from '~/admin/message'
 import type { AdminPayload } from '~/admin/decisions'
-import { securitySummary } from '#shared/injection-suite'
+import { injectionCategoryLabels, securitySummary } from '#shared/injection-suite'
 import type { InjectionAgent, InjectionCaseEvent, InjectionRunEvent, InjectionRunProvider, InjectionSuiteView } from '#shared/injection-suite'
 
 definePageMeta({ middleware: 'signed-in' })
@@ -44,6 +44,11 @@ const agentLabels: Record<InjectionAgent, string> = { teacher: 'Teacher', deskma
 function agentClass(agent: InjectionAgent): string {
   return agent === 'teacher' ? 'bg-brand-50 text-brand-700' : 'bg-amber-50 text-amber-800'
 }
+
+const verdictStyles = {
+  pass: { border: 'border-ink-200', badge: 'bg-emerald-50 text-emerald-700', label: 'Pass' },
+  leak: { border: 'border-rose-300', badge: 'bg-rose-50 text-rose-700', label: 'Leak' },
+} as const
 
 const running = ref(false)
 const provider = ref<InjectionRunProvider | null>(null)
@@ -439,6 +444,12 @@ function cancelRun() {
               </dd>
             </div>
           </dl>
+          <p
+            v-else
+            class="rounded-[6px] border border-dashed border-ink-300 px-3 py-4 text-sm leading-5 text-ink-500"
+          >
+            Run the suite to see the security score, pass and leak counts, the model and the shield state.
+          </p>
           <p class="text-[11px] leading-5 text-ink-500">
             The score is the share of finished cases with no leak. Results live only on this page and are not kept, so a reload loses them.
           </p>
@@ -446,61 +457,26 @@ function cancelRun() {
             <li
               v-for="result in cases"
               :key="result.id"
-              class="flex flex-wrap items-start gap-x-3 gap-y-1.5 rounded-[6px] border border-ink-200 bg-paper px-3 py-2"
+              class="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-[6px] border bg-paper px-3 py-2"
+              :class="verdictStyles[result.verdict].border"
             >
-              <span class="min-w-0 flex-1 text-[13px] leading-5 text-ink-800">{{ result.prompt }}</span>
+              <span class="min-w-0 flex-1 basis-full text-[13px] leading-5 text-ink-800 sm:basis-auto">{{ result.prompt }}</span>
+              <span
+                class="max-w-full shrink-0 rounded-[4px] bg-ink-100 px-1.5 py-0.5 text-left text-[10px] leading-[15px] font-medium text-ink-600"
+              >{{ injectionCategoryLabels[result.category] }}</span>
               <span
                 class="shrink-0 rounded-[4px] px-1.5 py-0.5 text-[10px] leading-[15px] font-medium"
                 :class="agentClass(result.agent)"
               >{{ agentLabels[result.agent] }}</span>
               <span
                 class="shrink-0 rounded-[4px] px-1.5 py-0.5 text-[10px] leading-[15px] font-medium"
-                :class="result.verdict === 'leak' ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'"
-              >{{ result.verdict === 'leak' ? 'Leak' : 'Pass' }}</span>
+                :class="verdictStyles[result.verdict].badge"
+              >{{ verdictStyles[result.verdict].label }}</span>
               <span v-if="result.leakedFragment" class="basis-full font-mono text-[11px] leading-5 text-rose-700">
                 leaked: {{ result.leakedFragment }}
               </span>
               <span v-if="result.replyExcerpt" class="basis-full text-[11px] leading-5 text-ink-500">
                 {{ result.replyExcerpt }}
-              </span>
-            </li>
-          </ol>
-        </section>
-
-        <section
-          v-for="category in data.categories"
-          :key="category.id"
-          class="flex min-w-0 flex-col gap-2 rounded-[8px] border border-ink-200 bg-ink-50/70 px-4 py-4 md:px-5"
-          :aria-label="category.label"
-        >
-          <div class="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 class="text-sm leading-5 font-semibold text-ink-900">
-              {{ category.label }}
-            </h2>
-            <p class="font-mono text-[11px] text-ink-500">
-              {{ category.cases.length }} cases
-              · <span class="text-emerald-700">{{ summary.categories[category.id]?.passed ?? 0 }} passed</span>,
-              <span class="text-rose-700">{{ summary.categories[category.id]?.leaked ?? 0 }} leaked</span>
-            </p>
-          </div>
-          <ol class="flex flex-col gap-1.5">
-            <li
-              v-for="(entry, index) in category.cases"
-              :key="entry.id"
-              class="flex flex-wrap items-start gap-x-3 gap-y-1.5 rounded-[6px] border border-ink-200 bg-paper px-3 py-2"
-            >
-              <span class="mt-0.5 font-mono text-[11px] leading-5 text-ink-400">{{ index + 1 }}</span>
-              <span class="min-w-0 flex-1 text-[13px] leading-5 text-ink-800">{{ entry.prompt }}</span>
-              <span
-                class="shrink-0 rounded-[4px] px-1.5 py-0.5 text-[10px] leading-[15px] font-medium"
-                :class="agentClass(entry.agent)"
-              >{{ agentLabels[entry.agent] }}</span>
-              <span
-                v-if="entry.priorTurns > 0"
-                class="shrink-0 rounded-[4px] bg-ink-100 px-1.5 py-0.5 text-[10px] leading-[15px] font-medium text-ink-600"
-              >{{ entry.priorTurns }} earlier turns</span>
-              <span v-if="entry.note" class="basis-full text-[11px] leading-5 text-ink-500">
-                {{ entry.note }}
               </span>
             </li>
           </ol>
