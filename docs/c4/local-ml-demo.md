@@ -47,3 +47,7 @@ The Inference component lives in `AI/inference/`. Its files divide the work as f
 Inference reuses the prompt research scorer and the numeric window scorer. The activity and submission tasks have distinct manifests and artifacts. In the browser, `collector.js` keeps the latest editor counts in a bounded ring. It splits them into five-second bins using the observation clock. The activity and forecast requests share a snapshot of the latest 24 complete bins or a labelled synthetic sample. The forecast request adds the demo's transient submission flag.
 
 The API tests run the server over loopback with the committed models or a temporary artifact directory. The browser tests drive the forms and inspect the requests to verify aggregate input, observation coverage and forecast eligibility. [Start and test the demo](../../AI/README.md).
+
+## Offline evaluation
+
+The reviewer runs `AI/evaluate-models.py` on a development machine. That command reads the pinned public datasets and the synthetic simulator, fits reference pipelines and uses the inference component's artifact loaders to verify the three held-out score sets. It writes local JSON and Markdown reports. Serving uses the committed exports directly. The default CI checks use small authored fixtures and the local browser demo.
