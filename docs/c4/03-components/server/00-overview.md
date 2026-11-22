@@ -3,8 +3,8 @@
 > [C4 index](../../README.md) / Level 3: Components / Turn and admin server
 
 Component-level view of `web/server/` and `web/shared/`. Every arrow below was checked against a real
-`import` statement (script over `web/server`, `web/shared`, `web/app`, `web/tests`, `web/e2e`; 234 resolved
-imports inside the repo — 208 relative and 26 through a Nuxt alias — 0 unresolved).
+`import` statement (script over `web/server`, `web/shared`, `web/app`, `web/tests`, `web/e2e`: 553 runtime imports
+inside the repo — 496 relative and 57 through a Nuxt alias — 0 unresolved).
 
 Legend: solid arrow = runtime import (the code is called). Thick arrow = runtime link with no import (HTTP call).
 Blue = component in this server, grey = another container, brown = external, teal = database.
@@ -32,6 +32,7 @@ flowchart LR
     lm["<b>language-model</b><br/>Real model, choice"]:::comp
     storage["<b>storage</b><br/>Store interfaces and<br/>Supabase versions"]:::comp
     admin["<b>admin</b><br/>Administrator handler"]:::comp
+    cyber["<b>cyber-security</b><br/>Injection suite and its run"]:::comp
     lecturer["<b>lecturer</b><br/>Lecturer handler"]:::comp
     student["<b>student</b><br/>Profile and reported actions"]:::comp
     activity["<b>activity recorder</b><br/>Append-only activity log"]:::comp
@@ -49,9 +50,13 @@ flowchart LR
   db[("<b>Postgres</b>")]:::db
   llm["<b>LLM provider</b>"]:::ext
 
-  spa ==>|"POST /turn, POST /api/student,<br/>POST /api/submission, POST /api/admin,<br/>GET /course-outline"| routes
+  spa ==>|"POST /turn, POST /api/student,<br/>POST /api/submission, POST /api/admin,<br/>GET /api/admin/security-suite,<br/>POST /api/admin/security-run, GET /course-outline"| routes
   routes -->|"handleTurn, streamTurn"| turn
   routes -->|"handleAdmin"| admin
+  routes -->|"handleSuiteRequest,<br/>handleRunRequest"| cyber
+  cyber -->|"handleTurn"| turn
+  cyber -->|"injectionCategoryIds,<br/>injectionCategoryLabels"| shared
+  cyber -.->|"type: Agents"| agents
   routes -->|"GET /api/lecturer · handleLecturer"| lecturer
   routes -->|"GET /api/staff/review · handleStaffReview"| staffReview
   staffReview -->|"defaultCourseId"| course
@@ -108,6 +113,7 @@ flowchart LR
 | language-model | `web/server/language-model/` | [server/07-language-model.md](07-language-model.md) |
 | storage | `web/server/storage/` | [server/08-storage.md](08-storage.md) |
 | admin | `web/server/admin/` | [server/09-admin.md](09-admin.md) |
+| cyber-security | `web/server/cyber-security/` | [server/19-cyber-security.md](19-cyber-security.md) |
 | lecturer | `web/server/lecturer/` | [server/10-lecturer.md](10-lecturer.md) |
 | student | `web/server/student/` | [server/11-student.md](11-student.md) |
 | activity recorder | `web/server/activity-recorder/` | [server/12-activity-recorder.md](12-activity-recorder.md) |
@@ -132,6 +138,7 @@ flowchart LR
 | learning-plan | shared | `LearningPlanView`, `LearningPlanStepView` |
 | study-suggestion | activity recorder, course, shared | `ActivityRow`; `Course`; `StudySuggestionAction`, `StudySuggestionView` |
 | admin | storage, language-model, verify-shield | `DecisionLogStore`, `ModelSettingsStore`, `StaffAccessLog`; `ModelSettings`; `VerifyShieldStore` |
+| cyber-security | agents, sandbox, shared | `Agents`; `Sandbox`; `InjectionSuiteView`, `InjectionAgent`, `InjectionCategoryId`, `InjectionRunEvent`, `InjectionCaseEvent`, `InjectionRunProvider` |
 | staff-review | storage, shared | `StaffReviewStore`, `StaffAccessLog`; `StaffReview` and its parts |
 
 Neither graph has a cycle. language-model imports nothing from agents: agents passes it the proposal schema as an
