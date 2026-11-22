@@ -95,6 +95,29 @@ pnpm exec playwright test --config playwright.ml.config.ts
 The browser suite starts its own local inference process on port 8765. Stop a running demo on that port before running the suite.
 It covers live counts, paste, reset and the composition event sequence. For a manual IME check, start a live observation and enter one committed word using your system IME. Confirm the counter increments on commit.
 
+### Reproduce the evaluation report
+
+From the repository root, with the Python 3.13 requirements installed:
+
+```sh
+python AI/evaluate-models.py --output AI/results
+```
+
+Read `AI/results/evaluation.md` for the comparisons and `AI/results/evaluation.json` for the complete run record. The command verifies the pinned English benchmark archive and reuses or downloads the pinned CS1 sample. It reconstructs the notebook splits and thresholds, fits the reference pipelines, then scores the holdouts with the same artifact loaders used by the demo. The 112 MB CS1 sample is cached in the operating system's temporary directory.
+
+The report records artifact and dataset checksums, split populations, threshold policies, confusion counts, AP and baseline metrics. A parity check uses absolute tolerance `1e-10` and relative tolerance `1e-8` and requires identical labels on each holdout row. Any input or parity failure exits nonzero before writing the report. The command produces aggregate results and leaves the published exports in place.
+
+The `ml-demo` CI job runs small HTTP, evaluation fixture and Chromium checks. It uses authored examples and the committed exports. Full public dataset evaluation runs on demand.
+
+### Short presentation rehearsal
+
+1. Open the local demo, submit an English programming prompt and show its label, score, threshold and version.
+2. Select **Sustained edits** and choose **Classify activity** to see the activity classification and 10-minute forecast from the same sample. Start a live observation to show the counts for typing, deleting and pasting.
+3. Try **Quiet window** to see a valid activity classification alongside an unavailable forecast. Mark the demo exercise submitted, then reset to start a new observation.
+4. Open the model evaluation details and the generated report. Compare the historical CS1 forecast to the active-bin baseline and explain the three dataset populations.
+
+To automate this walkthrough, run `pnpm exec playwright test --config playwright.ml.config.ts rehearsal.spec.ts` from `web/`. The test advances the browser clock for the live window.
+
 ## Offline self-harm content experiment
 
 This research experiment scores English prompts for the historical OpenAI moderation label `SH`. It reads one prompt at a time and uses a CPU model. The [research note](RESEARCH.md) explains the label, data source and limits.

@@ -62,6 +62,34 @@ jobs:
           name: verify-shield-benchmark
           path: web/benchmark/results/
 
+  ml-demo:
+    name: ml-demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: AI/requirements.txt
+      - run: python -m pip install -r AI/requirements.txt
+      - run: python -m unittest discover -s AI/tests
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: web
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: web
+      - run: pnpm exec playwright test --config playwright.ml.config.ts
+        working-directory: web
+
   # No AWS credential: the organisation denies OIDC providers, so CI checks the
   # Terraform against a mock provider and the account owner applies it.
   infrastructure:
