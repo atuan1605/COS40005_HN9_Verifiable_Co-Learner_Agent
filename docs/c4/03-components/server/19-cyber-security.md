@@ -4,8 +4,8 @@
 
 `web/server/cyber-security/`, the injection suite and the run that tests the agents with it. It loads and validates
 the committed suite, turns it into the listing the Cyber Security page shows, and streams a Cyber test run
-case by case. When the stream closes it writes one Cyber test record. Everything outside the folder goes through
-`index.ts`. Part of [server/00-overview.md](00-overview.md).
+case by case. When the stream closes it writes one Cyber test record, and the product owner's routes list, open and
+delete those records. Everything outside the folder goes through `index.ts`. Part of [server/00-overview.md](00-overview.md).
 
 Legend: solid = runtime import, dashed = type-only import, thick = runtime link with no import. Blue = this
 component, grey = other components.
@@ -20,6 +20,9 @@ flowchart LR
   spa["<b>Cyber Security page</b>"]:::near
   suiteRoute["<b>api/admin/security-suite.get.ts</b>"]:::near
   runRoute["<b>api/admin/security-run.post.ts</b>"]:::near
+  recordsRoute["<b>api/admin/security-records.get.ts</b>"]:::near
+  recordRoute["<b>api/admin/security-records/[id].get.ts</b>"]:::near
+  deleteRoute["<b>api/admin/security-records/[id].delete.ts</b>"]:::near
   admin["<b>admin/handle-admin.ts</b>"]:::near
   auth["<b>auth/staff-session-email.ts</b>"]:::near
   turn["<b>turn/handle-turn.ts</b>"]:::near
@@ -39,12 +42,16 @@ flowchart LR
     suite["<b>injection-suite.ts</b><br/>parseInjectionSuite, suiteView"]:::comp
     handleSuite["<b>handle-suite.ts</b><br/>handleSuiteRequest"]:::comp
     handleRun["<b>handle-run.ts</b><br/>handleRunRequest, one run"]:::comp
+    handleRecords["<b>handle-records.ts</b><br/>list, detail and delete"]:::comp
     run["<b>run-suite.ts</b><br/>runInjectionSuite"]:::comp
     fixture["<b>fixture.ts</b><br/>the fixture student, module,<br/>exercise and their text"]:::comp
   end
 
   spa ==>|"GET /api/admin/security-suite"| suiteRoute
   spa ==>|"POST /api/admin/security-run"| runRoute
+  spa ==>|"GET /api/admin/security-records"| recordsRoute
+  spa ==>|"GET /api/admin/security-records/:id"| recordRoute
+  spa ==>|"DELETE /api/admin/security-records/:id"| deleteRoute
   suiteRoute -->|"handleSuiteRequest,<br/>InjectionSuiteInvalidError"| index
   suiteRoute -->|"SignInRequiredError,<br/>ProductOwnerRequiredError"| admin
   suiteRoute -->|"staffSessionEmail"| auth
@@ -57,9 +64,22 @@ flowchart LR
   runRoute -->|"verifyShieldForTurn"| shield
   runRoute ==>|"the committed asset<br/>(useStorage)"| yaml
   runRoute -->|"the model, shield and<br/>record stores"| storage
+  recordsRoute -->|"handleRecordsRequest"| index
+  recordsRoute -->|"2 error classes"| admin
+  recordsRoute -->|"staffSessionEmail"| auth
+  recordsRoute -->|"the record store"| storage
+  recordRoute -->|"handleRecordRequest,<br/>CyberTestRecordNotFoundError"| index
+  recordRoute -->|"2 error classes"| admin
+  recordRoute -->|"staffSessionEmail"| auth
+  recordRoute -->|"the record store"| storage
+  deleteRoute -->|"handleDeleteRecordRequest,<br/>CyberTestRecordNotFoundError"| index
+  deleteRoute -->|"2 error classes"| admin
+  deleteRoute -->|"staffSessionEmail"| auth
+  deleteRoute -->|"the record store"| storage
   index --> suite
   index --> handleSuite
   index --> handleRun
+  index --> handleRecords
   index --> run
   handleSuite -->|"requireProductOwner"| admin
   handleSuite --> suite
@@ -69,6 +89,9 @@ flowchart LR
   handleRun --> suite
   handleRun -.->|"type: CyberTestRecordStore"| storage
   handleRun -.->|"type: InjectionRunEvent"| sharedTypes
+  handleRecords -->|"requireProductOwner"| admin
+  handleRecords -.->|"type: CyberTestRecordStore"| storage
+  handleRecords -.->|"types: record list item<br/>and detail"| sharedTypes
   run -->|"handleTurn"| turn
   run -.->|"type: Agents"| agents
   run -->|"createFakeSandbox, type: Sandbox"| sandbox
@@ -98,6 +121,12 @@ flowchart LR
 | `runInjectionSuite(suite, deps)` | function | The run itself, as an async generator of run events. |
 | `injectionRunBudgetMs` | constant | Four minutes. |
 | `InjectionRunDeps` | type | The agents, the captured shield state, the provider and model label, and the test-only overrides. |
+| `handleRecordsRequest(request)` | function | The administrator check, then the stored records newest first, without their case results. |
+| `handleRecordRequest(request, id)` | function | The administrator check, then one record with its case results and the per-family tally derived from them. |
+| `handleDeleteRecordRequest(request, id)` | function | The administrator check, then the record's removal, answering `{ deleted: true }`. |
+| `parseRecordId(segment)` | function | Reads the id from a path segment only when it is digits; anything else is not found. |
+| `CyberTestRecordNotFoundError` | class | `statusCode` 404, for an unknown or malformed id. |
+| `CyberTestRecordsRequest` | type | What the records routes pass in: the confirmed email, `adminEmails` and the record store. |
 | `InjectionSuiteRequest`, `InjectionRunRequest` | types | What a route passes in: the confirmed email, `adminEmails`, a loader for the committed text, and for a run the generator to stream, the optional guard callbacks and the record store. |
 | `fixtureStudentId`, `fixtureModuleId`, `fixtureExerciseId`, `fixtureExerciseTitle`, `fixtureHint`, `fixtureMisconception`, `fixtureSolution` | constants | The fixed world a case runs in (the Loops module and its summing exercise) and the text its forbidden fragments are authored against. |
 | `fixtureCourse` | value | The one-module course a run places every case in. Built by `courseFromSpec` in `fixture.ts`, so the case world never reads the real course. |
@@ -159,6 +188,19 @@ nothing, since there are no facts to identify it by. The record store's `record`
 logged and ignored, so the stream, the browser's status and the run are unchanged. The browser posts nothing
 about results; only the events already streamed decide the record.
 
+## The records API
+
+Three product-owner routes serve the history the page shows: `GET /api/admin/security-records` lists stored records
+newest first by the database's `created_at` then `id`, each line carrying the identity and every list fact but never
+the case results; `GET /api/admin/security-records/:id` returns one record with its stored cases and the per-family
+tally, which the handler derives with `securitySummary` rather than counting by hand; and
+`DELETE /api/admin/security-records/:id` removes one and answers `{ deleted: true }`. An unknown id, and a path
+segment that is not digits only (which would let `0x10` or `1e3` name a record), is a 404 before any store read or
+removal. There is no update route and no pagination: a
+record is immutable apart from being deleted. Every call refuses a caller who is not the product owner before touching
+the store. The shared contracts are `CyberTestRecordListItem`, the list line, and `CyberTestRecordDetail`, the line
+plus `cases` and `categories`; both live in `shared/injection-suite.ts` with `CyberTestStop`.
+
 The one-run flag lives in the route (`security-run.post.ts`), so one run streams per server instance. The route
 passes `begin` and `end`; `handleRunRequest` claims the flag after the administrator check and before loading the
 suite, refuses a second run with `InjectionRunInProgressError` (409), and wraps the stream so `end` releases the flag
@@ -185,11 +227,17 @@ blank; the run's record is kept server-side.
   `zod` and `yaml`. The suite asset is read by the routes, not here.
 - Runtime importers, all through `index.ts`: `api/admin/security-suite.get.ts` (`handleSuiteRequest`,
   `InjectionSuiteInvalidError`), `api/admin/security-run.post.ts` (`handleRunRequest`, `runInjectionSuite`,
-  `injectionRunBudgetMs`, `InjectionRunInProgressError`, `InjectionSuiteInvalidError`).
+  `injectionRunBudgetMs`, `InjectionRunInProgressError`, `InjectionSuiteInvalidError`),
+  `api/admin/security-records.get.ts` (`handleRecordsRequest`), `api/admin/security-records/[id].get.ts`
+  (`handleRecordRequest`, `parseRecordId`, `CyberTestRecordNotFoundError`) and
+  `api/admin/security-records/[id].delete.ts` (`handleDeleteRecordRequest`, `parseRecordId`,
+  `CyberTestRecordNotFoundError`).
 - Tests: `cyber-security-suite.test.ts` (parse, validate, list, administrator gate), `cyber-security-run.test.ts`
   (events, verdicts, shield pass-through, cancel, budget, summary arithmetic, and the record archived at the
-  request seam from a memory store). Both import from `server/cyber-security`.
-- The suite asset is loaded by the two routes through `useStorage('assets:server')`; nothing else reads it.
+  request seam from a memory store), `cyber-security-records.test.ts` (list order and shape, detail with the derived
+  tally, delete, unknown and malformed ids, and the owner gate before any store call). All import from
+  `server/cyber-security`.
+- The suite asset is loaded by the suite and run routes through `useStorage('assets:server')`; nothing else reads it.
 
 ## Notes
 

@@ -80,6 +80,34 @@ export interface InjectionCategoryTally {
   leaked: number
 }
 
+// How a stored Cyber test run stopped. A run cancelled by the browser has no
+// done event, so the record says so itself.
+export type CyberTestStop = 'complete' | 'budget' | 'cancelled'
+
+// One line of the administrator's history. The case results stay behind the
+// detail call, so a list line never carries what a reply leaked.
+export interface CyberTestRecordListItem {
+  id: number
+  startedAt: number
+  durationMs: number
+  provider: InjectionRunProvider
+  model: string
+  verifyShieldOn: boolean
+  stopped: CyberTestStop
+  suiteVersion: number
+  totalCases: number
+  finishedCases: number
+  passed: number
+  leaked: number
+  score: number | null
+}
+
+export interface CyberTestRecordDetail extends CyberTestRecordListItem {
+  cases: InjectionCaseEvent[]
+  // Derived from the stored cases with securitySummary, never stored itself.
+  categories: Partial<Record<InjectionCategoryId, InjectionCategoryTally>>
+}
+
 // What the page shows above the results, computed from the events alone.
 export interface SecuritySummary {
   // The share of finished cases with no leak; null until one finishes.

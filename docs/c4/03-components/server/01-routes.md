@@ -21,6 +21,9 @@ flowchart LR
     adminRoute["<b>api/admin.post.ts</b><br/>POST /api/admin"]:::comp
     suiteRoute["<b>api/admin/security-suite.get.ts</b><br/>GET /api/admin/security-suite"]:::comp
     runRoute["<b>api/admin/security-run.post.ts</b><br/>POST /api/admin/security-run"]:::comp
+    recordsRoute["<b>api/admin/security-records.get.ts</b><br/>GET /api/admin/security-records"]:::comp
+    recordRoute["<b>api/admin/security-records/[id].get.ts</b><br/>GET /api/admin/security-records/:id"]:::comp
+    deleteRoute["<b>api/admin/security-records/[id].delete.ts</b><br/>DELETE /api/admin/security-records/:id"]:::comp
     outlineRoute["<b>routes/course-outline.get.ts</b><br/>GET /course-outline"]:::comp
     studentRoute["<b>api/student.post.ts</b><br/>POST /api/student"]:::comp
     submissionRoute["<b>api/submission.post.ts</b><br/>POST /api/submission"]:::comp
@@ -41,6 +44,9 @@ flowchart LR
   spa ==>|"admin requests"| adminRoute
   spa ==>|"the injection suite"| suiteRoute
   spa ==>|"a Cyber test run"| runRoute
+  spa ==>|"past Cyber test records"| recordsRoute
+  spa ==>|"one Cyber test record"| recordRoute
+  spa ==>|"delete a Cyber test record"| deleteRoute
   spa ==>|"course outline"| outlineRoute
   spa ==>|"reported actions"| studentRoute
   spa ==>|"read a submission"| submissionRoute
@@ -67,6 +73,18 @@ flowchart LR
   runRoute -->|"resolveModelChoice,<br/>modelAddressLocked"| lm
   runRoute -->|"verifyShieldForTurn"| shield
   runRoute -->|"model settings and shield stores"| stores
+  recordsRoute -->|"handleRecordsRequest"| cyber
+  recordsRoute -->|"2 error classes"| handleAdmin
+  recordsRoute -->|"staffSessionEmail"| staffEmail
+  recordsRoute -->|"the record store"| stores
+  recordRoute -->|"handleRecordRequest and<br/>CyberTestRecordNotFoundError"| cyber
+  recordRoute -->|"2 error classes"| handleAdmin
+  recordRoute -->|"staffSessionEmail"| staffEmail
+  recordRoute -->|"the record store"| stores
+  deleteRoute -->|"handleDeleteRecordRequest and<br/>CyberTestRecordNotFoundError"| cyber
+  deleteRoute -->|"2 error classes"| handleAdmin
+  deleteRoute -->|"staffSessionEmail"| staffEmail
+  deleteRoute -->|"the record store"| stores
   outlineRoute -->|"defaultCourseId"| course
   studentRoute -->|"defaultCourseId"| course
   submissionRoute -->|"defaultCourseId"| course
@@ -88,6 +106,9 @@ flowchart LR
 | `api/staff/review.get.ts` | `GET ?studentNumber=`. Reads the confirmed email, builds the staff review and staff access log stores and calls `handleStaffReview`; maps `StaffReviewError` to its status (401, 403, 404). Sent `Cache-Control: private, no-store`. See [server/15-staff-review.md](15-staff-review.md). |
 | `api/admin/security-suite.get.ts` | Reads the confirmed email and the committed suite asset and calls `handleSuiteRequest`: 401 without a session, 403 for anyone but the administrator, and 500 with the full problem list when the suite does not parse or a family is short of fifteen cases. Sent `Cache-Control: private, no-store`. See [server/19-cyber-security.md](19-cyber-security.md). |
 | `api/admin/security-run.post.ts` | Reads the confirmed email and the suite asset and calls `handleRunRequest`, answering with 401, 403, 409 when a run is already streaming, or 500 for an invalid suite. The run is returned as NDJSON (`application/x-ndjson`), one run event per line, with buffering turned off; pulling the stream builds the model from the saved settings once, and cancelling it aborts the run and releases the one-run guard. When the stream closes, however it closes, the route's record store writes one Cyber test record; a failed write is logged and does not touch the stream. |
+| `api/admin/security-records.get.ts` | Reads the confirmed email, builds the record store and calls `handleRecordsRequest`: 401 without a session, 403 for anyone but the administrator, and the stored records newest first without their case results. Sent `Cache-Control: private, no-store`. See [server/19-cyber-security.md](19-cyber-security.md). |
+| `api/admin/security-records/[id].get.ts` | Calls `handleRecordRequest` with the id from the path: 401, 403, that route's full record with cases and the per-family tally, or 404 for an unknown or malformed id. Sent `Cache-Control: private, no-store`. |
+| `api/admin/security-records/[id].delete.ts` | Calls `handleDeleteRecordRequest` with the id from the path: 401, 403, `{ deleted: true }`, or 404 for an unknown or malformed id. |
 | `routes/course-outline.get.ts` | Public course outline for the About page: number, name, part, summary, availability, of the course read through the Supabase course store. No student data and none of the teacher-only content. |
 | `api/submission.post.ts` | Returns 401 when there is no session. With an `id`, returns that submission to the session student, 403 when it belongs to someone else, and 404 when it does not exist. Without an `id`, returns the session student's submissions. |
 
@@ -100,9 +121,12 @@ flowchart LR
 - `staff/review.get.ts`: `auth/staff-session-email`, `staff-review` (`handleStaffReview`, `StaffReviewError`), `storage/supabase-staff-review-store`, `supabase-staff-access-log`.
 - `admin/security-suite.get.ts`: `admin/handle-admin` (`SignInRequiredError`, `ProductOwnerRequiredError`), `auth/staff-session-email`, `cyber-security` (`handleSuiteRequest`, `InjectionSuiteInvalidError`).
 - `admin/security-run.post.ts`: `agents` (`createConfiguredAgents`), `language-model` (`modelAddressLocked`, `resolveModelChoice`), `storage/supabase-model-settings-store`, `supabase-verify-shield-store`, `supabase-cyber-test-record-store`, `verify-shield` (`verifyShieldForTurn`), `auth/staff-session-email`, `cyber-security` (`handleRunRequest`, `injectionRunBudgetMs`, `InjectionRunInProgressError`, `InjectionSuiteInvalidError`, `runInjectionSuite`), `admin/handle-admin` (`SignInRequiredError`, `ProductOwnerRequiredError`), `shared/injection-suite` (type).
+- `admin/security-records.get.ts`: `admin/handle-admin` (`SignInRequiredError`, `ProductOwnerRequiredError`), `auth/staff-session-email`, `cyber-security` (`handleRecordsRequest`), `storage/supabase-cyber-test-record-store`.
+- `admin/security-records/[id].get.ts`: the same, with `cyber-security` (`handleRecordRequest`, `parseRecordId`, `CyberTestRecordNotFoundError`).
+- `admin/security-records/[id].delete.ts`: the same, with `cyber-security` (`handleDeleteRecordRequest`, `parseRecordId`, `CyberTestRecordNotFoundError`).
 - `course-outline.get.ts`: `course` (`defaultCourseId`), `storage` (`supabase-course-store`).
 - `turn.post.ts` names the course of the turn (`defaultCourseId`: every student is enrolled in the Python course in sprint 1), creates the stores of student data for that course, including the store of stored mastery (ADR 0008), and passes the Supabase course store, the course id and the running commit to the turn handler.
-- Auto-imported, no import statement: `defineEventHandler`, `readBody`, `createError`, `sendStream`, `setResponseHeader`, `useRuntimeConfig`.
+- Auto-imported, no import statement: `defineEventHandler`, `readBody`, `createError`, `sendStream`, `setResponseHeader`, `useRuntimeConfig`, `getRouterParam`.
 
 ## Tests
 

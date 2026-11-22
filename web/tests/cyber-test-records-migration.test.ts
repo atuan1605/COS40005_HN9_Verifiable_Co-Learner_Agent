@@ -67,7 +67,11 @@ it('keeps Cyber test records for the server alone, one immutable row per run wit
     await expect(db.exec(`${insert}3, 0, 0, 0, null, '[]'::jsonb)`.replace(`'Fake model'`, `''`))).rejects.toMatchObject({ code: '23514' })
 
     await expect(db.exec(`update public.cyber_test_records set model = 'other'`)).rejects.toMatchObject({ code: '42501' })
-    await expect(db.exec('delete from public.cyber_test_records')).rejects.toMatchObject({ code: '42501' })
+
+    // The product owner deletes one record; the other stays.
+    await db.exec(`delete from public.cyber_test_records where stopped = 'cancelled'`)
+    const kept = (await db.query<{ n: string }>('select count(*) as n from public.cyber_test_records')).rows[0]!.n
+    expect(Number(kept)).toBe(1)
 
     for (const role of ['authenticated', 'anon']) {
       await db.exec(`reset role; set role ${role}`)
@@ -78,6 +82,7 @@ it('keeps Cyber test records for the server alone, one immutable row per run wit
            total_cases, finished_cases, passed, leaked, score)
         values (now(), 0, 'fake', 'Fake model', true, 'complete', 1, 0, 0, 0, 0, null)
       `)).rejects.toMatchObject({ code: '42501' })
+      await expect(db.exec('delete from public.cyber_test_records')).rejects.toMatchObject({ code: '42501' })
     }
   }
   finally {
