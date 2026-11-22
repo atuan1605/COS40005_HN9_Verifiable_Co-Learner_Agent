@@ -42,6 +42,7 @@ export default defineEventHandler(async (event) => {
       agents: createConfiguredAgents(settings, { production }),
       verifyShieldOn: await verifyShieldForTurn(createSupabaseVerifyShieldStore(connection), config.verifyShield),
       provider: choice.kind,
+      model: choice.kind === 'fake' ? 'Fake model' : choice.model,
       budgetMs: injectionRunBudgetMs,
       signal: controller.signal,
     })

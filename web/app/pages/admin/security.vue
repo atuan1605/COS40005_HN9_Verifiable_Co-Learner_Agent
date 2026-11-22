@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AdminHeader from '~/components/admin/AdminHeader.vue'
+import { securitySummary } from '#shared/injection-suite'
 import type { InjectionAgent, InjectionCaseEvent, InjectionRunEvent, InjectionRunProvider, InjectionSuiteView } from '#shared/injection-suite'
 
 definePageMeta({ middleware: 'signed-in' })
@@ -29,10 +30,47 @@ const provider = ref<InjectionRunProvider | null>(null)
 const cases = ref<InjectionCaseEvent[]>([])
 const stopped = ref<'complete' | 'budget' | null>(null)
 const runError = ref('')
+const totalCases = ref(0)
+const model = ref('')
+const startedAt = ref(0)
+const durationMs = ref<number | null>(null)
+// The browser clock measures the live duration, so a skewed server clock cannot
+// shift it. The done event replaces it with the server's own measurement.
+const requestedAt = ref(0)
+const now = ref(0)
+let ticker: ReturnType<typeof setInterval> | null = null
 let controller: AbortController | null = null
 
-const passed = computed(() => cases.value.filter(item => item.verdict === 'pass').length)
-const leaked = computed(() => cases.value.filter(item => item.verdict === 'leak').length)
+const elapsedMs = computed(() => {
+  if (durationMs.value !== null) return durationMs.value
+  if (requestedAt.value === 0) return 0
+  return Math.max(0, now.value - requestedAt.value)
+})
+
+// The summary reads only the events that have arrived, so a reload starts blank.
+const summary = computed(() => securitySummary(
+  cases.value,
+  totalCases.value,
+  model.value,
+  startedAt.value,
+  startedAt.value + elapsedMs.value,
+))
+
+const scoreLabel = computed(() => summary.value.score === null
+  ? 'Not yet scored'
+  : `${Math.round(summary.value.score * 100)}%`)
+
+const startedLabel = computed(() => summary.value.startedAt === 0
+  ? '—'
+  : new Date(summary.value.startedAt).toLocaleTimeString())
+
+const categoriesReached = computed(() => Object.keys(summary.value.categories).length)
+
+function formatDuration(ms: number): string {
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`
+  const seconds = Math.round(ms / 1000)
+  return `${Math.floor(seconds / 60)} m ${String(seconds % 60).padStart(2, '0')} s`
+}
 
 async function startRun() {
   if (running.value) return
@@ -40,6 +78,15 @@ async function startRun() {
   provider.value = null
   cases.value = []
   stopped.value = null
+  totalCases.value = 0
+  model.value = ''
+  startedAt.value = 0
+  durationMs.value = null
+  requestedAt.value = Date.now()
+  now.value = requestedAt.value
+  ticker = setInterval(() => {
+    now.value = Date.now()
+  }, 500)
   const abort = new AbortController()
   controller = abort
   running.value = true
@@ -69,6 +116,10 @@ async function startRun() {
   finally {
     running.value = false
     controller = null
+    if (ticker !== null) {
+      clearInterval(ticker)
+      ticker = null
+    }
   }
 }
 
@@ -90,9 +141,20 @@ async function readEvents(body: ReadableStream<Uint8Array>) {
 }
 
 function accept(event: InjectionRunEvent) {
-  if (event.type === 'start') provider.value = event.provider
-  else if (event.type === 'case') cases.value.push(event)
-  else stopped.value = event.stopped
+  now.value = Date.now()
+  if (event.type === 'start') {
+    provider.value = event.provider
+    model.value = event.model
+    startedAt.value = event.startedAt
+    totalCases.value = event.totalCases
+  }
+  else if (event.type === 'case') {
+    cases.value.push(event)
+  }
+  else {
+    stopped.value = event.stopped
+    durationMs.value = event.durationMs
+  }
 }
 
 function cancelRun() {
@@ -193,11 +255,6 @@ function cancelRun() {
             <p class="font-mono text-[11px] text-ink-500">
               {{ cases.length }} of {{ data.totalCases }} cases
             </p>
-            <p v-if="cases.length" class="font-mono text-[11px]">
-              <span class="text-emerald-700">{{ passed }} passed</span>
-              <span class="text-muted">, </span>
-              <span class="text-rose-700">{{ leaked }} leaked</span>
-            </p>
             <p v-if="running" role="status" class="text-xs text-ink-500">
               Running, results arrive case by case.
             </p>
@@ -221,6 +278,78 @@ function cancelRun() {
             class="rounded-sm border border-rose-200/80 bg-rose-50 px-[13px] py-[11px] text-xs leading-[19.5px] text-rose-700"
           >
             {{ runError }}
+          </p>
+          <dl
+            v-if="startedAt"
+            class="grid grid-cols-2 gap-3 rounded-[6px] border border-ink-200 bg-paper px-3 py-3 sm:grid-cols-4 xl:grid-cols-8"
+          >
+            <div class="col-span-2 rounded-[4px] bg-ink-50 px-2 py-1.5 sm:col-span-1">
+              <dt class="text-[11px] text-ink-500">
+                Security score
+              </dt>
+              <dd class="mt-0.5 font-mono text-lg leading-6 font-semibold text-ink-900">
+                {{ scoreLabel }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-[11px] text-ink-500">
+                Passed
+              </dt>
+              <dd class="mt-0.5 font-mono text-sm leading-5 font-semibold text-emerald-700">
+                {{ summary.passed }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-[11px] text-ink-500">
+                Leaked
+              </dt>
+              <dd class="mt-0.5 font-mono text-sm leading-5 font-semibold text-rose-700">
+                {{ summary.leaked }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-[11px] text-ink-500">
+                Cases finished
+              </dt>
+              <dd class="mt-0.5 font-mono text-sm leading-5 font-semibold text-ink-900">
+                {{ summary.resolved }} of {{ summary.total }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-[11px] text-ink-500">
+                Categories reached
+              </dt>
+              <dd class="mt-0.5 font-mono text-sm leading-5 font-semibold text-ink-900">
+                {{ categoriesReached }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-[11px] text-ink-500">
+                Model
+              </dt>
+              <dd class="mt-0.5 truncate font-mono text-sm leading-5 font-semibold text-ink-900" :title="summary.model">
+                {{ summary.model }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-[11px] text-ink-500">
+                Started
+              </dt>
+              <dd class="mt-0.5 font-mono text-sm leading-5 font-semibold text-ink-900">
+                {{ startedLabel }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-[11px] text-ink-500">
+                Duration
+              </dt>
+              <dd class="mt-0.5 font-mono text-sm leading-5 font-semibold text-ink-900">
+                {{ formatDuration(summary.durationMs) }}
+              </dd>
+            </div>
+          </dl>
+          <p class="text-[11px] leading-5 text-ink-500">
+            The score is the share of finished cases with no leak. Results live only on this page and are not kept, so a reload loses them.
           </p>
           <ol v-if="cases.length" class="flex flex-col gap-1.5">
             <li
@@ -259,6 +388,8 @@ function cancelRun() {
             </h2>
             <p class="font-mono text-[11px] text-ink-500">
               {{ category.cases.length }} cases
+              · <span class="text-emerald-700">{{ summary.categories[category.id]?.passed ?? 0 }} passed</span>,
+              <span class="text-rose-700">{{ summary.categories[category.id]?.leaked ?? 0 }} leaked</span>
             </p>
           </div>
           <ol class="flex flex-col gap-1.5">

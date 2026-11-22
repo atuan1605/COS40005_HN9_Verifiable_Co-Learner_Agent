@@ -13,8 +13,8 @@ import {
   type InjectionRunDeps,
   type InjectionSuite,
 } from '../server/cyber-security'
-import { injectionCategoryIds } from '../shared/injection-suite'
-import type { InjectionRunEvent } from '../shared/injection-suite'
+import { injectionCategoryIds, securitySummary } from '../shared/injection-suite'
+import type { InjectionCaseEvent, InjectionRunEvent } from '../shared/injection-suite'
 import { createFakeLanguageModel } from '../server/language-model'
 import type { handleTurn } from '../server/turn/handle-turn'
 import type { RedrawState } from '../shared/turn'
@@ -46,7 +46,7 @@ function casesOf(events: InjectionRunEvent[]) {
 }
 
 function deps(model: ReturnType<typeof createFakeLanguageModel>, overrides: Partial<InjectionRunDeps> = {}): InjectionRunDeps {
-  return { agents: createAgents(model), verifyShieldOn: true, provider: 'fake', concurrency: 1, ...overrides }
+  return { agents: createAgents(model), verifyShieldOn: true, provider: 'fake', model: 'Fake model', concurrency: 1, ...overrides }
 }
 
 // The teacher's render text is the scripted reply, so the reply decides the verdict.
@@ -84,7 +84,13 @@ describe('the injection run engine', () => {
       probe({ id: 'passes', forbiddenFragments: ['print(total)'] }),
     ]), deps(model)))
 
-    expect(events[0]).toEqual({ type: 'start', totalCases: 2, provider: 'fake' })
+    expect(events[0]).toEqual({
+      type: 'start',
+      totalCases: 2,
+      provider: 'fake',
+      model: 'Fake model',
+      startedAt: expect.any(Number),
+    })
     const [leak, pass] = casesOf(events)
     expect(leak).toMatchObject({
       id: 'leaks',
@@ -94,7 +100,16 @@ describe('the injection run engine', () => {
     })
     expect(leak.replyExcerpt).toContain('TOTAL += NUMBER')
     expect(pass).toMatchObject({ id: 'passes', verdict: 'pass', leakedFragment: null, replyExcerpt: '' })
-    expect(events.at(-1)).toEqual({ type: 'done', total: 2, passed: 1, leaked: 1, stopped: 'complete' })
+    const done = events.at(-1)
+    expect(done).toEqual({
+      type: 'done',
+      total: 2,
+      passed: 1,
+      leaked: 1,
+      stopped: 'complete',
+      durationMs: expect.any(Number),
+    })
+    expect((done as { durationMs: number }).durationMs).toBeGreaterThanOrEqual(0)
   })
 
   it('replays a case earlier turns before its prompt', async () => {
@@ -136,8 +151,21 @@ describe('the injection run engine', () => {
     ]), deps(teacherScript([]), { turn, budgetMs: 0 })))
 
     expect(events).toEqual([
-      { type: 'start', totalCases: 2, provider: 'fake' },
-      { type: 'done', total: 2, passed: 0, leaked: 0, stopped: 'budget' },
+      {
+        type: 'start',
+        totalCases: 2,
+        provider: 'fake',
+        model: 'Fake model',
+        startedAt: expect.any(Number),
+      },
+      {
+        type: 'done',
+        total: 2,
+        passed: 0,
+        leaked: 0,
+        stopped: 'budget',
+        durationMs: expect.any(Number),
+      },
     ])
     expect(turn).not.toHaveBeenCalled()
   })
@@ -159,6 +187,7 @@ describe('the injection run engine', () => {
       agents: {} as Agents,
       verifyShieldOn: false,
       provider: 'fake',
+      model: 'Fake model',
       concurrency: 1,
       turn,
     }))
@@ -188,6 +217,7 @@ describe('the injection run engine', () => {
       agents: {} as Agents,
       verifyShieldOn: true,
       provider: 'fake',
+      model: 'Fake model',
       turn,
     }))
 
@@ -204,7 +234,7 @@ describe('the injection run engine', () => {
     const iterating = (async () => {
       for await (const event of runInjectionSuite(
         suiteOf(Array.from({ length: 6 }, (_, index) => probe({ id: `case-${index + 1}` }))),
-        { agents: {} as Agents, verifyShieldOn: true, provider: 'fake', turn, signal: controller.signal },
+        { agents: {} as Agents, verifyShieldOn: true, provider: 'fake', model: 'Fake model', turn, signal: controller.signal },
       )) {
         events.push(event)
       }
@@ -218,6 +248,77 @@ describe('the injection run engine', () => {
 
     expect(events.every(event => event.type === 'start')).toBe(true)
     expect(events.some(event => event.type === 'done')).toBe(false)
+  })
+})
+
+describe('the security summary', () => {
+  it('scores a run where every case passes as 1 and tallies each category', async () => {
+    const model = teacherScript(['Try it yourself.', 'Try it yourself.'])
+    const events = await collect(runInjectionSuite(suiteOf([
+      probe({ id: 'pass-a', category: 'permission_overstep' }),
+      probe({ id: 'pass-b', category: 'system_prompt_extraction' }),
+    ]), deps(model)))
+
+    const summary = securitySummary(casesOf(events), 2, 'Fake model', 1_000, 2_500)
+
+    expect(summary).toMatchObject({
+      score: 1,
+      passed: 2,
+      leaked: 0,
+      resolved: 2,
+      total: 2,
+      model: 'Fake model',
+      startedAt: 1_000,
+      durationMs: 1_500,
+    })
+    expect(summary.categories.permission_overstep).toEqual({ passed: 1, leaked: 0 })
+    expect(summary.categories.system_prompt_extraction).toEqual({ passed: 1, leaked: 0 })
+  })
+
+  it('scores a run where every case leaks as 0', async () => {
+    const model = teacherScript(['total += number', 'total += number'])
+    const events = await collect(runInjectionSuite(suiteOf([
+      probe({ id: 'leak-a' }),
+      probe({ id: 'leak-b' }),
+    ]), deps(model)))
+
+    const summary = securitySummary(casesOf(events), 2, 'Fake model', 0, 10)
+
+    expect(summary).toMatchObject({ score: 0, passed: 0, leaked: 2, resolved: 2, total: 2 })
+    expect(summary.categories.answer_extraction).toEqual({ passed: 0, leaked: 2 })
+  })
+
+  it('leaves a run stopped at its budget unscored with nothing resolved', async () => {
+    const events = await collect(runInjectionSuite(suiteOf([
+      probe({ id: 'never-a' }),
+      probe({ id: 'never-b' }),
+      probe({ id: 'never-c' }),
+    ]), deps(teacherScript([]), { budgetMs: 0 })))
+
+    const summary = securitySummary(casesOf(events), 3, 'Fake model', 0, 0)
+
+    expect(summary).toMatchObject({
+      score: null,
+      passed: 0,
+      leaked: 0,
+      resolved: 0,
+      total: 3,
+      durationMs: 0,
+    })
+    expect(summary.categories).toEqual({})
+  })
+
+  it('scores only the finished cases when the run stops partway', () => {
+    const finished: InjectionCaseEvent[] = [
+      { type: 'case', id: 'a', category: 'permission_overstep', agent: 'teacher', prompt: 'p', verdict: 'pass', leakedFragment: null, replyExcerpt: '', priorTurns: 0 },
+      { type: 'case', id: 'b', category: 'permission_overstep', agent: 'teacher', prompt: 'p', verdict: 'pass', leakedFragment: null, replyExcerpt: '', priorTurns: 0 },
+      { type: 'case', id: 'c', category: 'answer_extraction', agent: 'deskmate', prompt: 'p', verdict: 'leak', leakedFragment: 'total += number', replyExcerpt: 'total += number', priorTurns: 0 },
+    ]
+
+    const summary = securitySummary(finished, 4, 'Fake model', 0, 0)
+
+    expect(summary).toMatchObject({ score: 2 / 3, passed: 2, leaked: 1, resolved: 3, total: 4 })
+    expect(summary.categories.answer_extraction).toEqual({ passed: 0, leaked: 1 })
   })
 })
 

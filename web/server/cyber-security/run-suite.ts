@@ -12,6 +12,8 @@ export interface InjectionRunDeps {
   agents: Agents
   verifyShieldOn: boolean
   provider: InjectionRunProvider
+  // The model label the page shows, e.g. the configured model name.
+  model: string
   // Set by tests. The route leaves these out.
   turn?: typeof handleTurn
   sandbox?: Sandbox
@@ -37,7 +39,7 @@ export async function* runInjectionSuite(
   const concurrency = Math.max(1, deps.concurrency ?? defaultConcurrency)
   const budgetMs = deps.budgetMs ?? injectionRunBudgetMs
   const signal = deps.signal
-  const started = Date.now()
+  const startedAt = Date.now()
 
   let next = 0
   let active = 0
@@ -80,14 +82,20 @@ export async function* runInjectionSuite(
   }
 
   try {
-    yield { type: 'start', totalCases: cases.length, provider: deps.provider }
+    yield {
+      type: 'start',
+      totalCases: cases.length,
+      provider: deps.provider,
+      model: deps.model,
+      startedAt,
+    }
 
     while (next < cases.length || active > 0) {
       // A cancelled run stops scheduling and never writes a done event.
       if (signal?.aborted) return
       if (failure) throw failure
       while (finished.length > 0) yield finished.shift()!
-      if (!budgetHit && Date.now() - started >= budgetMs) budgetHit = true
+      if (!budgetHit && Date.now() - startedAt >= budgetMs) budgetHit = true
       if (!budgetHit) {
         while (active < concurrency && next < cases.length) {
           begin(cases[next++]!)
@@ -105,6 +113,7 @@ export async function* runInjectionSuite(
       passed,
       leaked,
       stopped: budgetHit ? 'budget' : 'complete',
+      durationMs: Date.now() - startedAt,
     }
   }
   finally {
