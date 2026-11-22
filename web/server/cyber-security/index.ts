@@ -1,4 +1,5 @@
 export {
+  fixtureCourse,
   fixtureExerciseId,
   fixtureExerciseTitle,
   fixtureHint,

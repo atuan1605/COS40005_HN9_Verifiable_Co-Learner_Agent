@@ -1,7 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { injectionCategoryIds } from '../shared/injection-suite'
-import { handleSuiteRequest, parseInjectionSuite, suiteView, fixtureHint } from '../server/cyber-security'
+import {
+  fixtureCourse,
+  fixtureHint,
+  fixtureMisconception,
+  fixtureModuleId,
+  fixtureSolution,
+  handleSuiteRequest,
+  parseInjectionSuite,
+  suiteView,
+} from '../server/cyber-security'
 import { productOwnerAccount } from '../server/auth/demo-accounts'
 
 const adminEmails = 'assistant@example.com, owner@example.com'
@@ -168,5 +177,29 @@ describe('injection suite handler', () => {
     await expect(failure).rejects.toThrow(expect.objectContaining({
       message: expect.stringContaining('answer_extraction'),
     }))
+  })
+})
+
+describe('the fixture world', () => {
+  it('is one module holding the text the suite protects', () => {
+    expect(fixtureCourse.studyModules).toHaveLength(1)
+    const module = fixtureCourse.studyModules[0]!
+    expect(module.id).toBe(fixtureModuleId)
+    expect(module.hintLadder).toHaveLength(3)
+    expect(module.hintLadder[2]).toBe(fixtureHint)
+    expect(module.exercises.map(exercise => exercise.referenceSolution)).toContain(fixtureSolution)
+    expect(module.misconceptionResponses.map(response => response.response)).toContain(fixtureMisconception)
+  })
+
+  it('names protected text every committed case can actually meet', () => {
+    const suite = parsed(readFileSync(suiteAsset, 'utf8'))
+    const prompts = readFileSync(new URL('../server/agents/prompts.ts', import.meta.url), 'utf8')
+    const visible = `${JSON.stringify(fixtureCourse)}\n${prompts}`.toLowerCase()
+
+    const orphans = suite.cases
+      .filter(entry => !entry.forbiddenFragments.some(fragment => visible.includes(fragment.toLowerCase())))
+      .map(entry => entry.id)
+
+    expect(orphans).toEqual([])
   })
 })

@@ -85,7 +85,7 @@ which takes the mastery threshold from the course. The role table (which agent m
 
 - Runtime: `course.ts` imports `python-course.ts` and `materials.ts`; `python-course.ts` imports the five `modules/*` files; those import `materials.ts`; `parse-course-spec.ts` imports `course.ts`, `materials.ts` and `zod`. Nothing outside the folder reaches past `index.ts`.
 - Type only: `shared/turn`, `student-model` (`CourseStanding`), `verify-shield` (`CourseScope`), `course-spec` (from `course.ts`, `study-module.ts`, `python-course.ts` and the module files).
-- Runtime importers, through `index.ts`: `turn/handle-turn.ts`, `routes/turn.post.ts`, `routes/course-outline.get.ts`, `api/admin.post.ts` (`defaultCourseId`), `lecturer/handle-lecturer.ts` (`parseCourseSpec`), `storage/course-store.ts` and `storage/supabase-course-store.ts` (`courseFromSpec`, which normalises a stored spec).
+- Runtime importers, through `index.ts`: `turn/handle-turn.ts`, `routes/turn.post.ts`, `routes/course-outline.get.ts`, `api/admin.post.ts` (`defaultCourseId`), `lecturer/handle-lecturer.ts` (`parseCourseSpec`), `storage/course-store.ts` and `storage/supabase-course-store.ts` (`courseFromSpec`, which normalises a stored spec), and `cyber-security/fixture.ts` (`courseFromSpec`, building the one-module fixture course).
 - Tests: `course-spec.test.ts` and `course-spec.test-d.ts` (the spec and the course built from it), `decide.test.ts` (`pythonCourse.scope`), `mastery.test.ts` and `course-roadmap.test.ts` (`pythonCourse`), `python-runner.test.ts` (`studyModule`, `pythonCourse.studyModules`), `study-module-quiz.test.ts` (the quiz content), `turn-endpoint.test.ts`, `lecturer-handler.test.ts`, all through `server/course`.
 
 ## Notes

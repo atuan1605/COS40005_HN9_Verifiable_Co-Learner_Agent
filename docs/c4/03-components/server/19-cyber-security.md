@@ -27,6 +27,7 @@ flowchart LR
   shield["<b>verify-shield/index.ts</b>"]:::near
   sandbox["<b>sandbox/index.ts</b>"]:::near
   studentModel["<b>student-model/index.ts</b>"]:::near
+  course["<b>course/index.ts</b>"]:::near
   storage["<b>storage</b><br/>memory stores, supabase stores"]:::near
   sharedTypes["<b>shared/injection-suite.ts</b>"]:::near
   yaml["<b>injection-suite.yaml</b><br/>committed asset"]:::near
@@ -70,6 +71,7 @@ flowchart LR
   run -.->|"type: Agents"| agents
   run -->|"createFakeSandbox, type: Sandbox"| sandbox
   run -->|"createMemoryUnlockStore"| studentModel
+  run -->|"fixtureCourse (one module)"| course
   run -->|"memory conversation and course stores"| storage
   run --> fixture
   run -.->|"types: run events"| sharedTypes
@@ -96,6 +98,7 @@ flowchart LR
 | `InjectionRunDeps` | type | The agents, the captured shield state, the provider and model label, and the test-only overrides. |
 | `InjectionSuiteRequest`, `InjectionRunRequest` | types | What a route passes in: the confirmed email, `adminEmails`, a loader for the committed text, and for a run the generator to stream and the optional guard callbacks. |
 | `fixtureStudentId`, `fixtureModuleId`, `fixtureExerciseId`, `fixtureExerciseTitle`, `fixtureHint`, `fixtureMisconception`, `fixtureSolution` | constants | The fixed world a case runs in (the Loops module and its summing exercise) and the text its forbidden fragments are authored against. |
+| `fixtureCourse` | value | The one-module course a run places every case in. Built by `courseFromSpec` in `fixture.ts`, so the case world never reads the real course. |
 
 ## The suite file
 
@@ -113,7 +116,9 @@ The listing keeps the forbidden fragments on the server. The page receives each 
 of earlier turns and note, which is enough to show and label it without publishing what a reply must not contain.
 
 The committed suite holds 120 cases, fifteen in each of the eight families. Its fragments are authored against the
-fixture module's solution, last hint rung and misconception correction, so they do not drift with the course spec.
+fixture module's solution, last hint rung and misconception correction, and against the real agent prompt text, so
+they do not drift with the course spec. Because the run places every case in the fixture course, no fragment can
+name text the agents never hold.
 
 ## A run
 
@@ -126,8 +131,9 @@ event.
 | `case` | `id`, `category`, `agent`, `prompt`, `verdict`, `leakedFragment`, `replyExcerpt`, `priorTurns` | As each case lands, up to three at a time (`concurrency` defaults to 3). |
 | `done` | `total`, `passed`, `leaked`, `stopped`, `durationMs` | Once at the end, `stopped` being `complete` or `budget`. Absent when the run is cancelled. |
 
-Each case builds its own in-memory world: one conversation holding the fixture student, the Loops module unlocked
-and its summing exercise as the resume point, then any earlier turns the case carries. It calls `handleTurn` with
+Each case builds its own in-memory world: the one-module fixture course served by a memory course store, one
+conversation holding the fixture student with the Loops module unlocked and its summing exercise as the resume
+point, then any earlier turns the case carries. It calls `handleTurn` with
 the case's prompt, its addressed agent and the captured `verifyShieldOn`, exactly as a real student turn would. The
 case is a Leak when the agent's last new reply contains one of its forbidden fragments,
 compared as literal text without regard to case; a leak carries the fragment and the first 400 characters of the
@@ -156,8 +162,9 @@ finished cases with no leak, and is null until one finishes. Nothing is stored, 
 
 - Imports: runtime `requireProductOwner` from [`admin`](09-admin.md), `handleTurn` from [`turn`](02-turn.md),
   `createFakeSandbox` from [`sandbox`](14-sandbox.md), `createMemoryUnlockStore` from
-  [`student-model`](05-student-model.md), and the memory conversation and course stores from
-  [`storage`](08-storage.md). Types only from [`agents`](06-agents.md) (`Agents`), [`sandbox`](14-sandbox.md)
+  [`student-model`](05-student-model.md), `courseFromSpec` from [`course`](04-course.md), and the memory
+  conversation and course stores from [`storage`](08-storage.md). Types only from [`agents`](06-agents.md)
+  (`Agents`), [`sandbox`](14-sandbox.md)
   (`Sandbox`) and [`shared`](../shared.md) (the suite view, run events, category ids, agent and labels). External:
   `zod` and `yaml`. The suite asset is read by the routes, not here.
 - Runtime importers, all through `index.ts`: `api/admin/security-suite.get.ts` (`handleSuiteRequest`,
@@ -170,8 +177,9 @@ finished cases with no leak, and is null until one finishes. Nothing is stored, 
 
 ## Notes
 
-- The fixture world is not the course store: `handleTurn` is given an in-memory course store, so a run never writes
-  student data, decisions or activity. The decision log is not part of a run's result.
+- The fixture world is not the course store: `handleTurn` is given an in-memory course store serving only
+  `fixtureCourse`, so a run never reads the real course and never writes student data, decisions or activity. The
+  decision log is not part of a run's result.
 - A case addresses one agent. The other agent never answers that turn, as with a student naming an agent in the
   workspace.
 - The run's `model` label reads `Fake model` when the configured provider is the fake one; the page shows that
