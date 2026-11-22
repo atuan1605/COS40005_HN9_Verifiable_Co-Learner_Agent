@@ -22,6 +22,9 @@ PROMPT_TASK = "prompt_content"
 ACTIVITY_TASK = "editor_activity"
 FORECAST_TASK = "first_submission"
 FORECAST_HORIZON_SECONDS = 600
+# The two editor archives carry the same array schema and no task identifier.
+# Bind this published forecast version to its original CS1 artifact bytes.
+CS1_FORECAST_V1_SHA256 = "eb842512300025e252411629ee888428903cb6e9c1a8f40f5451cb2341ba2ccf"
 
 
 def load_prompt_artifact(model_dir: Path, manifest_path: Path) -> tuple[dict, PromptModel | None]:
@@ -52,6 +55,8 @@ def load_forecast_artifact(model_dir: Path, manifest_path: Path) -> tuple[dict, 
     return load_artifact(model_dir, manifest_path, load_window_model, {
         "task": FORECAST_TASK,
         "artifact": "cs1-submission-model.npz",
+        "modelVersion": "first-submission-v1",
+        "sha256": CS1_FORECAST_V1_SHA256,
         "formatVersion": WINDOW_FORMAT,
         "featureVersion": WINDOW_FEATURE_VERSION,
         "featureNames": list(FEATURE_NAMES),

@@ -22,6 +22,7 @@ let observation = null
 let revision = 0
 let pending = false
 let alreadySubmitted = false
+let awaitingForecast = true
 let notice = 'Start an observation or choose a sample.'
 
 const syncEditor = countEditorChanges(editor, (changes) => {
@@ -61,32 +62,42 @@ function renderObservation() {
   editor.disabled = !observation
   reset.disabled = !(observation || sample || alreadySubmitted)
   markSubmitted.disabled = alreadySubmitted || !(observation || sample)
+  if (awaitingForecast && !alreadySubmitted) {
+    const message = forecastPrompt(sample || live?.window, live)
+    if (forecastResult.textContent !== message) forecastResult.textContent = message
+  }
+}
+
+function forecastPrompt(complete, live) {
+  if (complete) return 'Classify activity to see the forecast for this window.'
+  if (live) return 'Observe a full two minutes before forecasting.'
+  return 'Start an observation or choose a sample.'
 }
 
 function clearResult() {
   revision++
   pending = false
+  awaitingForecast = true
   result.hidden = true
   result.textContent = ''
-  forecastResult.textContent = alreadySubmitted
-    ? 'This demo exercise already has a submission.'
-    : 'Classify a complete editor window to see its forecast.'
+  forecastResult.textContent = alreadySubmitted ? 'This demo exercise already has a submission.' : ''
 }
 
 function startObservation() {
   sampleSelect.value = ''
   editor.value = ''
   syncEditor()
-  alreadySubmitted = false
   observation = createObservation(performance.now())
   clearResult()
-  forecastResult.textContent = 'Observe a full two minutes before forecasting.'
   renderObservation()
   editor.focus()
 }
 
 start.addEventListener('click', startObservation)
-reset.addEventListener('click', startObservation)
+reset.addEventListener('click', () => {
+  alreadySubmitted = false
+  startObservation()
+})
 markSubmitted.addEventListener('click', () => {
   alreadySubmitted = true
   forecastResult.textContent = 'This demo exercise already has a submission.'
@@ -117,41 +128,43 @@ classify.addEventListener('click', async () => {
   const submittedRevision = revision
   const submittedState = alreadySubmitted
   pending = true
+  awaitingForecast = false
   result.hidden = false
   result.textContent = 'Scoring editor activity…'
   if (!submittedState) forecastResult.textContent = 'Preparing forecast…'
   renderObservation()
 
-  await Promise.all([
-    showInference('/api/classify/activity', request, result, showActivityScore, () => submittedRevision === revision),
-    showInference('/api/predict/submission', { ...request, alreadySubmitted: submittedState }, forecastResult,
-      showForecastScore, () => submittedRevision === revision && submittedState === alreadySubmitted),
-  ])
-  if (submittedRevision === revision) {
-    pending = false
-    renderObservation()
+  try {
+    await Promise.all([
+      showInference('/api/classify/activity', request, result, showActivityScore, () => submittedRevision === revision),
+      showInference('/api/predict/submission', { ...request, alreadySubmitted: submittedState }, forecastResult,
+        showForecastScore, () => submittedRevision === revision && submittedState === alreadySubmitted),
+    ])
+  }
+  finally {
+    if (submittedRevision === revision) {
+      pending = false
+      renderObservation()
+    }
   }
 })
 
 async function showInference(path, request, target, showScore, isCurrent) {
-  let response
-  let data
   try {
-    response = await fetch(path, {
+    const response = await fetch(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request),
     })
-    data = await response.json()
+    const data = await response.json()
+    if (!isCurrent()) return
+    if (!response.ok) target.textContent = data.error.message
+    else if (data.status === 'unavailable') target.textContent = data.message
+    else showScore(data)
   }
   catch {
-    if (isCurrent()) target.textContent = 'Could not reach the local model. Try again.'
-    return
+    if (isCurrent()) target.textContent = 'Could not get a result from the local model. Try again.'
   }
-  if (!isCurrent()) return
-  if (!response.ok) target.textContent = data.error.message
-  else if (data.status === 'unavailable') target.textContent = data.message
-  else showScore(data)
 }
 
 function showActivityScore(data) {
@@ -196,8 +209,10 @@ export function showForecastModel(model) {
   }
   const { evaluation } = model
   const availability = model.available ? '' : 'The submission model is currently unavailable. '
+  const baseline = evaluation.activeEditBinsAveragePrecision
+  const comparison = baseline > evaluation.averagePrecision ? 'higher, at ' : ''
   forecastDetails.textContent =
-    `${availability}Experimental. ${model.meaning} On the historical CS1 holdout, average precision was ${evaluation.averagePrecision.toFixed(4)}. The simple active-bin baseline scored higher, at ${evaluation.activeEditBinsAveragePrecision.toFixed(4)}.`
+    `${availability}Experimental. ${model.meaning} On the historical CS1 holdout, average precision was ${evaluation.averagePrecision.toFixed(4)}. The simple active-bin baseline scored ${comparison}${baseline.toFixed(4)}.`
 }
 
 renderObservation()

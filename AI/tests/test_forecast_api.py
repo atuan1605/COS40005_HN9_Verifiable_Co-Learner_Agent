@@ -1,3 +1,4 @@
+from hashlib import sha256
 import json
 from pathlib import Path
 import shutil
@@ -116,8 +117,16 @@ class ForecastApiTests(unittest.TestCase):
     def test_activity_archive_cannot_be_loaded_as_a_forecast(self):
         with TemporaryDirectory() as directory:
             model_dir = Path(directory)
-            shutil.copyfile(AI_ROOT / "keystroke-activity-model.npz", model_dir / "cs1-submission-model.npz")
-            base = self.start_server(model_dir=model_dir)
+            renamed = model_dir / "cs1-submission-model.npz"
+            shutil.copyfile(AI_ROOT / "keystroke-activity-model.npz", renamed)
+            # Simulate an accidentally re-signed manifest whose checksum and threshold
+            # agree with the wrong archive. The forecast version still identifies CS1.
+            manifest = json.loads((AI_ROOT / "forecast-model-manifest.json").read_text(encoding="utf-8"))
+            manifest["sha256"] = sha256(renamed.read_bytes()).hexdigest()
+            manifest["threshold"] = 0.5
+            changed_manifest = model_dir / "forecast-model-manifest.json"
+            changed_manifest.write_text(json.dumps(manifest), encoding="utf-8")
+            base = self.start_server(model_dir=model_dir, forecast_manifest_path=changed_manifest)
             with self.assertRaises(HTTPError) as failure:
                 post(base, {**observation(EDITING), "alreadySubmitted": False})
             with failure.exception as response:

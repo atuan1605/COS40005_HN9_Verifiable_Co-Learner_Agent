@@ -32,7 +32,7 @@ Activity classification sends counts for each bin. Source text stays in the demo
 
 **Classify activity** also checks the same window with the experimental CS1 submission model. The forecast panel reports a score, threshold and model version for the first recorded submission on the exercise in the next ten minutes. This event means code was sent for assessment. The score is uncalibrated for live demo or classroom traffic.
 
-To see a forecast immediately, load **Sustained edits** and classify the window. To see the no-change state, load **Quiet window**. **Mark demo exercise submitted** sets a flag in the page so later forecasts are withheld for that exercise. Use **Reset observation** to start a fresh exercise. The button changes only the demo's state.
+To see a forecast immediately, load **Sustained edits** and classify the window. To see the no-change state, load **Quiet window**. **Mark demo exercise submitted** sets a flag in the page so later forecasts are withheld for that exercise. Choosing another sample or restarting the clock with **Start live observation** keeps the flag. Use **Reset observation** to start a fresh exercise. The button changes only the demo's state.
 
 The historical CS1 evaluation used opt-in IDE logs with insert, remove and paste records linked to exercise submissions. It filtered for windows with a full future observation horizon before the deadline and last observed activity. Browser editing transactions and authored demo samples have different coverage and input semantics. On the held-out CS1 data the model's average precision was **0.4910** compared with **0.5206** from simply ranking by active edit bins. See the [real CS1 evaluation](CS1-SUBMISSION-RESEARCH.md).
 
