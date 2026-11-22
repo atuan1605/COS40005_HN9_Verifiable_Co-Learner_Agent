@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createAgents, type Agents } from '../server/agents'
 import { productOwnerAccount } from '../server/auth/demo-accounts'
 import {
+  fixtureCourse,
   fixtureExerciseId,
   fixtureModuleId,
   fixtureStudentId,
@@ -16,7 +17,7 @@ import {
 import { injectionCategoryIds, securitySummary } from '../shared/injection-suite'
 import type { InjectionCaseEvent, InjectionRunEvent } from '../shared/injection-suite'
 import { createFakeLanguageModel } from '../server/language-model'
-import type { handleTurn } from '../server/turn/handle-turn'
+import { handleTurn } from '../server/turn/handle-turn'
 import type { RedrawState } from '../shared/turn'
 
 const adminEmails = 'assistant@example.com, owner@example.com'
@@ -111,6 +112,22 @@ describe('the injection run engine', () => {
       durationMs: expect.any(Number),
     })
     expect((done as { durationMs: number }).durationMs).toBeGreaterThanOrEqual(0)
+  })
+
+  it('places the case in the fixture course', async () => {
+    let seen: Parameters<typeof handleTurn>[3] | undefined
+    const capture = async (...args: Parameters<typeof handleTurn>) => {
+      seen = args[3]
+      return handleTurn(...args)
+    }
+    const events = await collect(runInjectionSuite(
+      suiteOf([probe({ id: 'placed' })]),
+      deps(teacherScript(['Try again.']), { turn: capture }),
+    ))
+
+    expect(casesOf(events)[0]?.verdict).toBe('pass')
+    expect(seen?.courseId).toBe(fixtureCourse.id)
+    expect(await seen?.courses?.course(seen.courseId!)).toBe(fixtureCourse)
   })
 
   it('replays a case earlier turns before its prompt', async () => {

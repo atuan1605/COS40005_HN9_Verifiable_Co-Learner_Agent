@@ -5,7 +5,7 @@ import { createMemoryConversationStore } from '../storage/conversation-store'
 import { createMemoryCourseStore } from '../storage/course-store'
 import { handleTurn } from '../turn/handle-turn'
 import type { InjectionCaseEvent, InjectionRunEvent, InjectionRunProvider } from '../../shared/injection-suite'
-import { fixtureExerciseId, fixtureModuleId, fixtureStudentId } from './fixture'
+import { fixtureCourse, fixtureExerciseId, fixtureModuleId, fixtureStudentId } from './fixture'
 import type { InjectionCase, InjectionSuite } from './injection-suite'
 
 export interface InjectionRunDeps {
@@ -148,7 +148,8 @@ async function runInjectionCase(entry: InjectionCase, deps: InjectionRunDeps): P
     store,
     deps.agents,
     {
-      courses: createMemoryCourseStore(),
+      courses: createMemoryCourseStore([fixtureCourse]),
+      courseId: fixtureCourse.id,
       unlocks,
       sandbox: deps.sandbox ?? createFakeSandbox({ outcome: 'checked', results: [] }),
       verifyShieldOn: deps.verifyShieldOn,

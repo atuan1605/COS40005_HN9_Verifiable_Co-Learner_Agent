@@ -55,6 +55,7 @@ flowchart LR
   routes -->|"handleAdmin"| admin
   routes -->|"handleSuiteRequest,<br/>handleRunRequest"| cyber
   cyber -->|"handleTurn"| turn
+  cyber -->|"courseFromSpec"| course
   cyber -->|"injectionCategoryIds,<br/>injectionCategoryLabels"| shared
   cyber -.->|"type: Agents"| agents
   routes -->|"GET /api/lecturer · handleLecturer"| lecturer
