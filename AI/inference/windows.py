@@ -21,6 +21,10 @@ class EditorWindow:
     def complete(self) -> bool:
         return self.observed_seconds == WINDOW_SECONDS
 
+    @property
+    def has_editor_changes(self) -> bool:
+        return any(edits > 0 or pastes > 0 for edits, _, pastes in self.bins)
+
     def features(self) -> np.ndarray:
         return window_features(np.asarray(self.bins, dtype=int)).reshape(1, -1)
 

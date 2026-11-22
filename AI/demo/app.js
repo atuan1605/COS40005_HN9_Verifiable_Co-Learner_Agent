@@ -1,4 +1,4 @@
-import { showActivityModel } from './activity.js'
+import { showActivityModel, showForecastModel } from './activity.js'
 
 const form = document.querySelector('#prompt-form')
 const promptInput = document.querySelector('#prompt')
@@ -80,6 +80,7 @@ async function showModelDetails() {
     const { models } = await response.json()
     const model = models.find(item => item.task === 'prompt_content')
     showActivityModel(models.find(item => item.task === 'editor_activity'))
+    showForecastModel(models.find(item => item.task === 'first_submission'))
     const { evaluation } = model
     modelStatus.textContent = model.available ? model.meaning : 'The prompt model is currently unavailable.'
     if (!evaluation) return
@@ -98,6 +99,7 @@ async function showModelDetails() {
   catch {
     modelStatus.textContent = 'Could not load model details. Refresh to try again.'
     showActivityModel()
+    showForecastModel()
   }
 }
 

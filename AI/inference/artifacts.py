@@ -17,8 +17,11 @@ from .windows import WINDOW_FEATURE_VERSION
 AI_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = AI_ROOT / "model-manifest.json"
 ACTIVITY_MANIFEST_PATH = AI_ROOT / "activity-model-manifest.json"
+FORECAST_MANIFEST_PATH = AI_ROOT / "forecast-model-manifest.json"
 PROMPT_TASK = "prompt_content"
 ACTIVITY_TASK = "editor_activity"
+FORECAST_TASK = "first_submission"
+FORECAST_HORIZON_SECONDS = 600
 
 
 def load_prompt_artifact(model_dir: Path, manifest_path: Path) -> tuple[dict, PromptModel | None]:
@@ -43,6 +46,19 @@ def load_activity_artifact(model_dir: Path, manifest_path: Path) -> tuple[dict, 
         "positiveLabel": "editing",
         "negativeLabel": "other_activity",
     }, ("threeActiveBinsF1",), ("heldOutProfiles",))
+
+
+def load_forecast_artifact(model_dir: Path, manifest_path: Path) -> tuple[dict, WindowModel | None]:
+    return load_artifact(model_dir, manifest_path, load_window_model, {
+        "task": FORECAST_TASK,
+        "artifact": "cs1-submission-model.npz",
+        "formatVersion": WINDOW_FORMAT,
+        "featureVersion": WINDOW_FEATURE_VERSION,
+        "featureNames": list(FEATURE_NAMES),
+        "horizonSeconds": FORECAST_HORIZON_SECONDS,
+        "positiveLabel": "submission_within_10_minutes",
+        "negativeLabel": "no_submission_within_10_minutes",
+    }, ("activeEditBinsAveragePrecision", "constantScoreAveragePrecision", "alwaysPositiveF1"), ("heldOutLearners",))
 
 
 def load_artifact[Model: (PromptModel, WindowModel)](

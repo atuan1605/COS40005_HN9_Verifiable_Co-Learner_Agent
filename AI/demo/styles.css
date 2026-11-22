@@ -54,7 +54,7 @@ details p { margin-block-start: .8rem; }
 dl { display: grid; gap: .75rem; margin: .75rem 0 0; }
 details dl { grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
 dd { margin: 0; overflow-wrap: anywhere; }
-#prompt-result, #activity-result {
+#prompt-result, #activity-result, #forecast-result {
   margin-block-start: 1rem;
   border: 1px solid var(--color-brand-200);
   background: var(--color-brand-50);

@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import re
 
-from .artifacts import ACTIVITY_MANIFEST_PATH, AI_ROOT, MANIFEST_PATH
+from .artifacts import ACTIVITY_MANIFEST_PATH, AI_ROOT, FORECAST_MANIFEST_PATH, MANIFEST_PATH
 from .service import ApiError, InferenceService
 
 
@@ -17,6 +17,7 @@ ASSETS = {
 }
 PROMPT_ROUTE = "/api/classify/prompt"
 ACTIVITY_ROUTE = "/api/classify/activity"
+FORECAST_ROUTE = "/api/predict/submission"
 MODELS_ROUTE = "/api/models"
 
 
@@ -52,11 +53,13 @@ def create_server(
     model_dir: Path = AI_ROOT,
     manifest_path: Path = MANIFEST_PATH,
     activity_manifest_path: Path = ACTIVITY_MANIFEST_PATH,
+    forecast_manifest_path: Path = FORECAST_MANIFEST_PATH,
 ) -> ThreadingHTTPServer:
-    service = InferenceService.load(model_dir, manifest_path, activity_manifest_path)
+    service = InferenceService.load(model_dir, manifest_path, activity_manifest_path, forecast_manifest_path)
     post_routes = {
         PROMPT_ROUTE: service.classify_prompt,
         ACTIVITY_ROUTE: service.classify_activity,
+        FORECAST_ROUTE: service.predict_submission,
     }
     assets = demo_assets()
 
