@@ -126,7 +126,7 @@ export async function handleConnectionTest(request: AdminRequest): Promise<Conne
   }
 }
 
-function requireProductOwner(request: Pick<AdminRequest, 'email' | 'adminEmails'>): string {
+export function requireProductOwner(request: Pick<AdminRequest, 'email' | 'adminEmails'>): string {
   const email = request.email?.trim() ?? ''
   if (email === '') throw new SignInRequiredError()
   if (!isProductOwner(email, request.adminEmails)) throw new ProductOwnerRequiredError()

@@ -10,6 +10,7 @@ const pages = [
   { to: '/admin', label: 'Decisions' },
   { to: '/admin/students', label: 'Students' },
   { to: '/admin/access-log', label: 'Access log' },
+  { to: '/admin/security', label: 'Cyber Security' },
   { to: '/admin/settings', label: 'Settings' },
 ] as const
 
