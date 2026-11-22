@@ -14,6 +14,7 @@ import {
   type InjectionRunDeps,
   type InjectionSuite,
 } from '../server/cyber-security'
+import { createMemoryCyberTestRecordStore } from '../server/storage/cyber-test-record-store'
 import { injectionCategoryIds, securitySummary } from '../shared/injection-suite'
 import type { InjectionCaseEvent, InjectionRunEvent } from '../shared/injection-suite'
 import { createFakeLanguageModel } from '../server/language-model'
@@ -66,6 +67,22 @@ function generatedSuite(): string {
         `  - id: ${category}-${String(number).padStart(2, '0')}`,
         `    category: ${category}`,
         `    agent: ${number % 2 === 0 ? 'deskmate' : 'teacher'}`,
+        `    prompt: "Probe ${number} for ${category}"`,
+        '    forbiddenFragments: ["total += number"]',
+      )
+    }
+  }
+  return `${lines.join('\n')}\n`
+}
+
+function teacherOnlySuite(): string {
+  const lines = ['version: 1', 'cases:']
+  for (const category of injectionCategoryIds) {
+    for (let number = 1; number <= 15; number++) {
+      lines.push(
+        `  - id: ${category}-${String(number).padStart(2, '0')}`,
+        `    category: ${category}`,
+        '    agent: teacher',
         `    prompt: "Probe ${number} for ${category}"`,
         '    forbiddenFragments: ["total += number"]',
       )
@@ -418,5 +435,212 @@ describe('the injection run request', () => {
       end: vi.fn(),
     })).rejects.toBeInstanceOf(InjectionRunInProgressError)
     expect(load).not.toHaveBeenCalled()
+  })
+})
+
+describe('archiving a cyber test record', () => {
+  const startedAt = 1_700_000_000_000
+
+  const passed: InjectionCaseEvent = {
+    type: 'case',
+    id: 'permission-overstep-01',
+    category: 'permission_overstep',
+    agent: 'teacher',
+    prompt: 'A probe.',
+    verdict: 'pass',
+    leakedFragment: null,
+    replyExcerpt: '',
+    priorTurns: 0,
+  }
+  const leaked: InjectionCaseEvent = {
+    type: 'case',
+    id: 'answer-extraction-01',
+    category: 'answer_extraction',
+    agent: 'deskmate',
+    prompt: 'Another probe.',
+    verdict: 'leak',
+    leakedFragment: 'total += number',
+    replyExcerpt: 'total += number',
+    priorTurns: 0,
+  }
+
+  function started(): InjectionRunEvent {
+    return {
+      type: 'start',
+      totalCases: 120,
+      provider: 'fake',
+      model: 'Fake model',
+      startedAt,
+      verifyShieldOn: true,
+    }
+  }
+
+  function done(overrides: Partial<Extract<InjectionRunEvent, { type: 'done' }>> = {}): InjectionRunEvent {
+    return { type: 'done', total: 120, passed: 1, leaked: 1, stopped: 'complete', durationMs: 500, ...overrides }
+  }
+
+  function scripted(events: InjectionRunEvent[]): () => AsyncGenerator<InjectionRunEvent> {
+    return () => (async function* () {
+      yield* events
+    })()
+  }
+
+  async function request(run: () => AsyncGenerator<InjectionRunEvent>, records: ReturnType<typeof createMemoryCyberTestRecordStore>) {
+    return handleRunRequest({
+      email: productOwnerAccount.email,
+      adminEmails,
+      load: async () => generatedSuite(),
+      run,
+      records,
+    })
+  }
+
+  it('writes one complete record whose fields and cases match the streamed events', async () => {
+    const records = createMemoryCyberTestRecordStore()
+    const events = [started(), passed, leaked, done()]
+
+    const streamed = await collect(await request(scripted(events), records))
+
+    expect(streamed).toEqual(events)
+    expect(records.rows).toHaveLength(1)
+    expect(records.rows[0]).toMatchObject({
+      startedAt,
+      durationMs: 500,
+      provider: 'fake',
+      model: 'Fake model',
+      verifyShieldOn: true,
+      stopped: 'complete',
+      suiteVersion: 1,
+      totalCases: 120,
+      finishedCases: 2,
+      passed: 1,
+      leaked: 1,
+      score: 0.5,
+    })
+    expect(records.rows[0]!.cases).toEqual([passed, leaked])
+  })
+
+  it('records what a real engine run streamed', async () => {
+    const records = createMemoryCyberTestRecordStore()
+    const replies = Array.from({ length: 120 }, () => 'Try writing the loop yourself first.')
+
+    const streamed = await collect(await handleRunRequest({
+      email: productOwnerAccount.email,
+      adminEmails,
+      load: async () => teacherOnlySuite(),
+      run: suite => runInjectionSuite(suite, deps(teacherScript(replies), { concurrency: 1 })),
+      records,
+    }))
+
+    const cases = casesOf(streamed)
+    expect(cases).toHaveLength(120)
+    expect(records.rows).toHaveLength(1)
+    expect(records.rows[0]).toMatchObject({
+      provider: 'fake',
+      model: 'Fake model',
+      verifyShieldOn: true,
+      stopped: 'complete',
+      suiteVersion: 1,
+      totalCases: 120,
+      finishedCases: 120,
+      passed: 120,
+      leaked: 0,
+      score: 1,
+    })
+    expect(records.rows[0]!.cases).toEqual(cases)
+  })
+
+  it('archives a budget stop as budget', async () => {
+    const records = createMemoryCyberTestRecordStore()
+
+    await collect(await request(
+      scripted([started(), passed, done({ passed: 1, leaked: 0, stopped: 'budget', durationMs: 240_000 })]),
+      records,
+    ))
+
+    expect(records.rows).toHaveLength(1)
+    expect(records.rows[0]).toMatchObject({ stopped: 'budget', durationMs: 240_000, score: 1 })
+  })
+
+  it('archives a cancelled stream as cancelled with only the cases it delivered', async () => {
+    const records = createMemoryCyberTestRecordStore()
+    const events = await request(scripted([started(), passed, leaked, done()]), records)
+
+    const seen: InjectionRunEvent[] = []
+    for await (const event of events) {
+      seen.push(event)
+      if (seen.length === 2) break
+    }
+
+    expect(seen.map(event => event.type)).toEqual(['start', 'case'])
+    expect(records.rows).toHaveLength(1)
+    expect(records.rows[0]).toMatchObject({
+      stopped: 'cancelled',
+      finishedCases: 1,
+      passed: 1,
+      leaked: 0,
+      score: 1,
+      totalCases: 120,
+    })
+    expect(records.rows[0]!.cases).toEqual([passed])
+    expect(records.rows[0]!.durationMs).toBeGreaterThanOrEqual(0)
+  })
+
+  it('leaves the score null when no case finished', async () => {
+    const records = createMemoryCyberTestRecordStore()
+
+    await collect(await request(scripted([started(), done({ passed: 0, leaked: 0 })]), records))
+
+    expect(records.rows[0]).toMatchObject({ finishedCases: 0, score: null })
+  })
+
+  it('keeps the stream intact when the store rejects', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const events = [started(), passed, done({ leaked: 0 })]
+
+    const streamed = await collect(await handleRunRequest({
+      email: productOwnerAccount.email,
+      adminEmails,
+      load: async () => generatedSuite(),
+      run: scripted(events),
+      records: {
+        async record() {
+          throw new Error('the table is down')
+        },
+      },
+    }))
+
+    expect(streamed).toEqual(events)
+    expect(error).toHaveBeenCalled()
+    error.mockRestore()
+  })
+
+  it('writes nothing when the caller, the suite or the guard refuses the run', async () => {
+    const other = createMemoryCyberTestRecordStore()
+    await expect(handleRunRequest({
+      email: 'an@example.com',
+      adminEmails,
+      load: async () => generatedSuite(),
+      run: vi.fn(),
+      records: other,
+    })).rejects.toMatchObject({ statusCode: 403 })
+    await expect(handleRunRequest({
+      email: productOwnerAccount.email,
+      adminEmails,
+      load: async () => 'version: 1\ncases: [',
+      run: vi.fn(),
+      records: other,
+    })).rejects.toBeInstanceOf(InjectionSuiteInvalidError)
+    await expect(handleRunRequest({
+      email: productOwnerAccount.email,
+      adminEmails,
+      load: async () => generatedSuite(),
+      run: vi.fn(),
+      begin: () => false,
+      end: vi.fn(),
+      records: other,
+    })).rejects.toBeInstanceOf(InjectionRunInProgressError)
+
+    expect(other.rows).toEqual([])
   })
 })

@@ -4,7 +4,8 @@
 
 `web/server/cyber-security/`, the injection suite and the run that tests the agents with it. It loads and validates
 the committed suite, turns it into the listing the Cyber Security page shows, and streams a Cyber test run
-case by case. Everything outside the folder goes through `index.ts`. Part of [server/00-overview.md](00-overview.md).
+case by case. When the stream closes it writes one Cyber test record. Everything outside the folder goes through
+`index.ts`. Part of [server/00-overview.md](00-overview.md).
 
 Legend: solid = runtime import, dashed = type-only import, thick = runtime link with no import. Blue = this
 component, grey = other components.
@@ -55,7 +56,7 @@ flowchart LR
   runRoute -->|"resolveModelChoice,<br/>modelAddressLocked"| lm
   runRoute -->|"verifyShieldForTurn"| shield
   runRoute ==>|"the committed asset<br/>(useStorage)"| yaml
-  runRoute -->|"the model and shield stores"| storage
+  runRoute -->|"the model, shield and<br/>record stores"| storage
   index --> suite
   index --> handleSuite
   index --> handleRun
@@ -66,6 +67,7 @@ flowchart LR
   handleRun -->|"requireProductOwner"| admin
   handleRun -->|"InjectionSuiteInvalidError"| handleSuite
   handleRun --> suite
+  handleRun -.->|"type: CyberTestRecordStore"| storage
   handleRun -.->|"type: InjectionRunEvent"| sharedTypes
   run -->|"handleTurn"| turn
   run -.->|"type: Agents"| agents
@@ -91,12 +93,12 @@ flowchart LR
 | `InjectionSuiteParseResult` | type | `{ ok: true, suite }` or `{ ok: false, problems }`. |
 | `handleSuiteRequest(request)` | function | The administrator check, then load, parse and list. |
 | `InjectionSuiteInvalidError` | class | `statusCode` 500 and the `problems`, so the route can answer every one of them. |
-| `handleRunRequest(request)` | function | The administrator check, the one-run guard, load and parse, then the run's event stream wrapped so the guard is released however the stream ends. |
+| `handleRunRequest(request)` | function | The administrator check, the one-run guard, load and parse, then the run's event stream wrapped so the guard is released however the stream ends and one Cyber test record is written when it closes. |
 | `InjectionRunInProgressError` | class | `statusCode` 409, refused before any model call. |
 | `runInjectionSuite(suite, deps)` | function | The run itself, as an async generator of run events. |
 | `injectionRunBudgetMs` | constant | Four minutes. |
 | `InjectionRunDeps` | type | The agents, the captured shield state, the provider and model label, and the test-only overrides. |
-| `InjectionSuiteRequest`, `InjectionRunRequest` | types | What a route passes in: the confirmed email, `adminEmails`, a loader for the committed text, and for a run the generator to stream and the optional guard callbacks. |
+| `InjectionSuiteRequest`, `InjectionRunRequest` | types | What a route passes in: the confirmed email, `adminEmails`, a loader for the committed text, and for a run the generator to stream, the optional guard callbacks and the record store. |
 | `fixtureStudentId`, `fixtureModuleId`, `fixtureExerciseId`, `fixtureExerciseTitle`, `fixtureHint`, `fixtureMisconception`, `fixtureSolution` | constants | The fixed world a case runs in (the Loops module and its summing exercise) and the text its forbidden fragments are authored against. |
 | `fixtureCourse` | value | The one-module course a run places every case in. Built by `courseFromSpec` in `fixture.ts`, so the case world never reads the real course. |
 
@@ -140,9 +142,22 @@ compared as literal text without regard to case; a leak carries the fragment and
 reply. Messages before the prompt are never counted as the reply, so a seeded earlier turn cannot decide a case.
 
 The run schedules cases until all have started or the four-minute budget is reached; with the budget reached it
-stops scheduling, finishes the cases already running and closes with `stopped: 'budget'`. Nothing the run touches is
-persisted. A cancel aborts the route's signal, the engine returns without a `done` event, and the generator's
-`finally` releases the one-run guard.
+stops scheduling, finishes the cases already running and closes with `stopped: 'budget'`. Nothing the run touches
+is persisted, apart from the one Cyber test record described next. A cancel aborts the route's signal, the engine
+returns without a `done` event, and the generator's `finally` releases the one-run guard.
+
+## The Cyber test record
+
+`handleRunRequest` reads the stream it returns and, when that stream closes, writes one [Cyber test
+record](../server/08-storage.md) with the run's `start` facts (start time, provider, model label, shield state,
+total cases), its suite version, every `case` event it delivered, and the counts and score computed from them. A
+run that delivered `done` is stored `complete` or `budget`; a stream that closed without `done` is stored
+`cancelled` with only the cases the browser received, and its duration is the time since `start`. A record with no
+finished case holds a null score, never zero. A refused caller, an invalid suite and a second concurrent run write
+nothing, because they fail before a stream exists. A run that fails before its `start` event also writes
+nothing, since there are no facts to identify it by. The record store's `record` can reject: the failure is
+logged and ignored, so the stream, the browser's status and the run are unchanged. The browser posts nothing
+about results; only the events already streamed decide the record.
 
 The one-run flag lives in the route (`security-run.post.ts`), so one run streams per server instance. The route
 passes `begin` and `end`; `handleRunRequest` claims the flag after the administrator check and before loading the
@@ -156,7 +171,8 @@ page shows.
 The page does not wait for `done` to show totals. `securitySummary` in `shared/injection-suite.ts` is a pure
 function of the events that have arrived: passed, leaked, the number finished of the total, the per-category tally
 of the families reached, the model label, the start time and the duration so far. The score is the share of
-finished cases with no leak, and is null until one finishes. Nothing is stored, so a reload starts blank.
+finished cases with no leak, and is null until one finishes. Nothing on the page is stored, so a reload starts
+blank; the run's record is kept server-side.
 
 ## Verified imports
 
@@ -164,15 +180,15 @@ finished cases with no leak, and is null until one finishes. Nothing is stored, 
   `createFakeSandbox` from [`sandbox`](14-sandbox.md), `createMemoryUnlockStore` from
   [`student-model`](05-student-model.md), `courseFromSpec` from [`course`](04-course.md), and the memory
   conversation and course stores from [`storage`](08-storage.md). Types only from [`agents`](06-agents.md)
-  (`Agents`), [`sandbox`](14-sandbox.md)
-  (`Sandbox`) and [`shared`](../shared.md) (the suite view, run events, category ids, agent and labels). External:
+  (`Agents`), [`sandbox`](14-sandbox.md) (`Sandbox`), [`storage`](08-storage.md) (`CyberTestRecordStore`) and
+  [`shared`](../shared.md) (the suite view, run events, category ids, agent and labels). External:
   `zod` and `yaml`. The suite asset is read by the routes, not here.
 - Runtime importers, all through `index.ts`: `api/admin/security-suite.get.ts` (`handleSuiteRequest`,
   `InjectionSuiteInvalidError`), `api/admin/security-run.post.ts` (`handleRunRequest`, `runInjectionSuite`,
   `injectionRunBudgetMs`, `InjectionRunInProgressError`, `InjectionSuiteInvalidError`).
 - Tests: `cyber-security-suite.test.ts` (parse, validate, list, administrator gate), `cyber-security-run.test.ts`
-  (events, verdicts, shield pass-through, cancel, budget, summary arithmetic). Both import from
-  `server/cyber-security`.
+  (events, verdicts, shield pass-through, cancel, budget, summary arithmetic, and the record archived at the
+  request seam from a memory store). Both import from `server/cyber-security`.
 - The suite asset is loaded by the two routes through `useStorage('assets:server')`; nothing else reads it.
 
 ## Notes

@@ -1,5 +1,6 @@
 import { createConfiguredAgents } from '../../agents'
 import { modelAddressLocked, resolveModelChoice, type ModelSettings } from '../../language-model'
+import { createSupabaseCyberTestRecordStore } from '../../storage/supabase-cyber-test-record-store'
 import { createSupabaseModelSettingsStore } from '../../storage/supabase-model-settings-store'
 import { createSupabaseVerifyShieldStore } from '../../storage/supabase-verify-shield-store'
 import { verifyShieldForTurn } from '../../verify-shield'
@@ -69,6 +70,7 @@ export default defineEventHandler(async (event) => {
       end: () => {
         activeRun = false
       },
+      records: createSupabaseCyberTestRecordStore(connection),
     })
   }
   catch (error) {
