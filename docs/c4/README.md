@@ -40,7 +40,7 @@ Components are ordered the way a request travels through them (server) or the wa
 | [16-learning-pattern.md](03-components/server/16-learning-pattern.md) | learning pattern | Where the student's work says they struggle and how they study, one pure function of their records |
 | [17-learning-plan.md](03-components/server/17-learning-plan.md) | learning plan | The Teacher's one-to-five-step plan for a module, agreed by the student, kept as append-only revisions |
 | [18-study-suggestion.md](03-components/server/18-study-suggestion.md) | study suggestion | The one next step chosen by fixed rules from the student's activity log, and the memory of what they dismissed |
-| [19-cyber-security.md](03-components/server/19-cyber-security.md) | cyber-security | The injection suite, its validation, and the streamed run that tests the agents with it |
+| [19-cyber-security.md](03-components/server/19-cyber-security.md) | cyber-security | The injection suite, its validation, the streamed run that tests the agents with it, and the record each run leaves |
 
 ### Web app (`web/app/`)
 

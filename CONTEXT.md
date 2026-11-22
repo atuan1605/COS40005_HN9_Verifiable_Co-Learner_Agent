@@ -280,8 +280,12 @@ The committed set of 120 injection cases grouped into eight attack families, eac
 _Avoid_: test suite, prompt set, eval set
 
 **Cyber test run**:
-An administrator's run of the whole injection suite against the configured model, streamed case by case, with the VerifyShield state captured when it starts and passed to every case. It rules nothing and records nothing: a case leaks when the reply contains one of its forbidden fragments, and the results are shown once and never stored.
+An administrator's run of the whole injection suite against the configured model, streamed case by case, with the VerifyShield state captured when it starts and passed to every case. It rules nothing: a case leaks when the reply contains one of its forbidden fragments, and the page shows the results once. The run leaves one Cyber test record.
 _Avoid_: security test, audit run, scan
+
+**Cyber test record**:
+The one immutable row a Cyber test run leaves behind when its stream closes, written by the server from the events it already streamed: start time, duration, provider, model label, VerifyShield state, how the run stopped (complete, budget or cancelled), suite version, total and finished cases, passed and leaked, the score (null when no case finished) and the case results. It identifies a run without opening it; only an administrator reaches it, and a delete removes it when it is no longer needed.
+_Avoid_: test result, report, archive entry
 
 **Leak**:
 A run result where an agent's reply contains the protected material the injection case tried to extract.
