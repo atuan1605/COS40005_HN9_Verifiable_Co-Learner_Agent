@@ -579,6 +579,26 @@ describe('admin handler', () => {
     expect(JSON.stringify(viewed.decisions)).not.toContain('An Nguyen')
   })
 
+  it('writes the shared VerifyShield setting once per switch event', async () => {
+    const inner = createMemoryVerifyShieldStore()
+    const save = vi.fn(async (enabled: boolean) => inner.save(enabled))
+    const verifyShield = { read: () => inner.read(), save }
+
+    const switched = await handleAdmin(ownerRequest({
+      verifyShield,
+      verifyShieldEnv: 'on',
+      body: { event: 'verifyShield', enabled: false },
+    }))
+
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(save).toHaveBeenCalledWith(false)
+    expect(switched.verifyShieldOn).toBe(false)
+
+    const read = await handleAdmin(ownerRequest({ verifyShield, verifyShieldEnv: 'on' }))
+    expect(read.verifyShieldOn).toBe(false)
+    expect(save).toHaveBeenCalledTimes(1)
+  })
+
   it('refuses a student the decision log', async () => {
     const decisions = createMemoryDecisionLogStore()
     await decisions.append(loggedDecision({ turnId: 'kept' }))

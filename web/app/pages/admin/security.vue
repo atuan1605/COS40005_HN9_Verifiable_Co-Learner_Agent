@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import AdminHeader from '~/components/admin/AdminHeader.vue'
+import BusySpinner from '~/components/BusySpinner.vue'
+import { messageFrom } from '~/admin/message'
+import type { AdminPayload } from '~/admin/decisions'
 import { securitySummary } from '#shared/injection-suite'
 import type { InjectionAgent, InjectionCaseEvent, InjectionRunEvent, InjectionRunProvider, InjectionSuiteView } from '#shared/injection-suite'
 
@@ -11,6 +14,23 @@ const { data, error } = await useAsyncData(
   'product-owner-injection-suite',
   () => requestFetch<InjectionSuiteView>('/api/admin/security-suite'),
 )
+
+// The switch reads and writes the same setting as the Settings page, through the same admin event.
+const { data: shieldState, error: shieldError, refresh: refreshShield } = await useAsyncData(
+  'product-owner-shield-state',
+  () => requestFetch<AdminPayload>('/api/admin', { method: 'POST', body: { event: 'read' } }),
+)
+
+const verifyShieldOn = ref(true)
+const switching = ref(false)
+const switchError = ref('')
+// A failed read leaves no known state, so the switch stays out of reach rather
+// than offering a guess at what the setting holds.
+const shieldUnread = computed(() => Boolean(shieldError.value))
+
+watch(shieldState, (payload) => {
+  if (payload) verifyShieldOn.value = payload.verifyShieldOn
+}, { immediate: true })
 
 const refused = computed(() => error.value?.statusCode === 403)
 const unavailable = computed(() => Boolean(error.value) && !refused.value)
@@ -34,6 +54,8 @@ const totalCases = ref(0)
 const model = ref('')
 const startedAt = ref(0)
 const durationMs = ref<number | null>(null)
+// The shield state the current run started with, so a later switch leaves it alone.
+const runShield = ref<boolean | null>(null)
 // The browser clock measures the live duration, so a skewed server clock cannot
 // shift it. The done event replaces it with the server's own measurement.
 const requestedAt = ref(0)
@@ -72,6 +94,24 @@ function formatDuration(ms: number): string {
   return `${Math.floor(seconds / 60)} m ${String(seconds % 60).padStart(2, '0')} s`
 }
 
+async function onVerifyShield(event: Event) {
+  const enabled = event.target instanceof HTMLInputElement && event.target.checked
+  verifyShieldOn.value = enabled
+  switchError.value = ''
+  switching.value = true
+  try {
+    await $fetch('/api/admin', { method: 'POST', body: { event: 'verifyShield', enabled } })
+    await refreshShield()
+  }
+  catch (caught) {
+    switchError.value = messageFrom(caught, 'The settings could not be saved.')
+    await refreshShield()
+  }
+  finally {
+    switching.value = false
+  }
+}
+
 async function startRun() {
   if (running.value) return
   runError.value = ''
@@ -82,6 +122,7 @@ async function startRun() {
   model.value = ''
   startedAt.value = 0
   durationMs.value = null
+  runShield.value = null
   requestedAt.value = Date.now()
   now.value = requestedAt.value
   ticker = setInterval(() => {
@@ -147,6 +188,7 @@ function accept(event: InjectionRunEvent) {
     model.value = event.model
     startedAt.value = event.startedAt
     totalCases.value = event.totalCases
+    runShield.value = event.verifyShieldOn
   }
   else if (event.type === 'case') {
     cases.value.push(event)
@@ -265,6 +307,47 @@ function cancelRun() {
               The run stopped at its time budget.
             </p>
           </div>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <label class="flex min-h-11 items-center gap-3 text-sm text-default md:min-h-0">
+              <input
+                type="checkbox"
+                class="size-5"
+                name="verifyShield"
+                :checked="verifyShieldOn"
+                :disabled="switching || shieldUnread"
+                :aria-busy="switching"
+                @change="onVerifyShield"
+              >
+              VerifyShield is {{ shieldUnread ? 'unavailable' : verifyShieldOn ? 'on' : 'off' }}
+              <BusySpinner
+                v-if="switching"
+                class="text-brand-600"
+              />
+            </label>
+            <NuxtLink
+              to="/admin/settings"
+              class="text-sm text-brand-600 underline underline-offset-2"
+            >
+              Settings
+            </NuxtLink>
+            <p class="text-xs text-ink-500">
+              A run uses the setting saved when it starts.
+            </p>
+          </div>
+          <p
+            v-if="shieldUnread"
+            role="alert"
+            class="text-xs leading-4 text-rose-700"
+          >
+            The VerifyShield setting could not be read, so the switch is unavailable. Reload to try again.
+          </p>
+          <p
+            v-if="switchError"
+            role="alert"
+            class="text-xs leading-4 text-rose-700"
+          >
+            {{ switchError }}
+          </p>
           <p
             v-if="provider === 'fake'"
             role="status"
@@ -281,7 +364,7 @@ function cancelRun() {
           </p>
           <dl
             v-if="startedAt"
-            class="grid grid-cols-2 gap-3 rounded-[6px] border border-ink-200 bg-paper px-3 py-3 sm:grid-cols-4 xl:grid-cols-8"
+            class="grid grid-cols-2 gap-3 rounded-[6px] border border-ink-200 bg-paper px-3 py-3 sm:grid-cols-4 xl:grid-cols-9"
           >
             <div class="col-span-2 rounded-[4px] bg-ink-50 px-2 py-1.5 sm:col-span-1">
               <dt class="text-[11px] text-ink-500">
@@ -329,6 +412,14 @@ function cancelRun() {
               </dt>
               <dd class="mt-0.5 truncate font-mono text-sm leading-5 font-semibold text-ink-900" :title="summary.model">
                 {{ summary.model }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-[11px] text-ink-500">
+                VerifyShield
+              </dt>
+              <dd class="mt-0.5 font-mono text-sm leading-5 font-semibold" :class="runShield === false ? 'text-rose-700' : 'text-ink-900'">
+                {{ runShield === null ? '—' : runShield ? 'On' : 'Off' }}
               </dd>
             </div>
             <div>

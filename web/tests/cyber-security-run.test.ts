@@ -90,6 +90,7 @@ describe('the injection run engine', () => {
       provider: 'fake',
       model: 'Fake model',
       startedAt: expect.any(Number),
+      verifyShieldOn: true,
     })
     const [leak, pass] = casesOf(events)
     expect(leak).toMatchObject({
@@ -157,6 +158,7 @@ describe('the injection run engine', () => {
         provider: 'fake',
         model: 'Fake model',
         startedAt: expect.any(Number),
+        verifyShieldOn: true,
       },
       {
         type: 'done',
@@ -170,7 +172,7 @@ describe('the injection run engine', () => {
     expect(turn).not.toHaveBeenCalled()
   })
 
-  it('passes the VerifyShield flag through to the turn', async () => {
+  it('reports the shield state in the start event and passes it to every case', async () => {
     const seen: (boolean | undefined)[] = []
     const turn = (async (_request, store, _agents, options) => {
       seen.push(options?.verifyShieldOn)
@@ -182,8 +184,9 @@ describe('the injection run engine', () => {
       })
       return {} as RedrawState
     }) as typeof handleTurn
+    const cases = Array.from({ length: 3 }, (_, index) => probe({ id: `shield-${index + 1}` }))
 
-    await collect(runInjectionSuite(suiteOf([probe({ id: 'one' })]), {
+    const events = await collect(runInjectionSuite(suiteOf(cases), {
       agents: {} as Agents,
       verifyShieldOn: false,
       provider: 'fake',
@@ -192,7 +195,8 @@ describe('the injection run engine', () => {
       turn,
     }))
 
-    expect(seen).toEqual([false])
+    expect(events[0]).toMatchObject({ type: 'start', verifyShieldOn: false })
+    expect(seen).toEqual([false, false, false])
   })
 
   it('keeps at most three cases running at a time and finishes every case', async () => {
