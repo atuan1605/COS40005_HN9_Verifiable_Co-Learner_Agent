@@ -3,13 +3,16 @@ from pathlib import Path
 
 import numpy as np
 from sklearn.metrics import average_precision_score
-from sklearn.model_selection import GroupKFold, GroupShuffleSplit, StratifiedKFold, cross_val_predict, train_test_split
 
 from benchmark import ARCHIVE_SHA256, DATA_URL, REVISION, load_benchmark
 from classroom_probes import CLASSROOM_CASES
 from cs1_submission_data import (
     HORIZON_SECONDS, RANGE_BYTES, RANGE_STARTS, SAMPLE_SHA256, SOURCE_BYTES,
     WINDOW_SECONDS, fetch_source, load_windows,
+)
+from experiment_protocol import (
+    forecast_development_scores, forecast_threshold, grouped_split,
+    prompt_development_scores, prompt_split, prompt_threshold,
 )
 from inference.artifacts import (
     ACTIVITY_MANIFEST_PATH, AI_ROOT, FORECAST_MANIFEST_PATH, MANIFEST_PATH,
@@ -19,7 +22,7 @@ from keystroke_data import FEATURE_NAMES, SEED, simulate_windows, window_feature
 from keystroke_model import PREDICTION_THRESHOLD, build_model as build_window_model
 from prompt_model import SEED as PROMPT_SEED, build_model as build_prompt_model
 
-from .metrics import assert_disjoint_groups, binary_metrics, select_threshold, verify_parity
+from .metrics import binary_metrics, verify_parity
 
 
 def partition(labels: np.ndarray, groups: np.ndarray | None = None) -> dict:
@@ -27,13 +30,6 @@ def partition(labels: np.ndarray, groups: np.ndarray | None = None) -> dict:
     if groups is not None:
         counts["groups"] = len(set(groups))
     return counts
-
-
-def grouped_split(x: np.ndarray, y: np.ndarray, groups: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    split = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=SEED)
-    development, holdout = next(split.split(x, y, groups))
-    assert_disjoint_groups(groups[development], groups[holdout])
-    return development, holdout
 
 
 def trained_result(
@@ -59,16 +55,11 @@ def evaluate_prompt(model_dir: Path = AI_ROOT) -> dict:
         raise ValueError("The prompt model export is missing or fails its manifest checks.")
     prompts, labels, counts = load_benchmark()
     y = np.asarray(labels)
-    development, holdout = train_test_split(
-        np.arange(len(y)), test_size=0.2, stratify=y, random_state=PROMPT_SEED,
-    )
+    development, holdout = prompt_split(y)
     development_prompts = [prompts[i] for i in development]
     holdout_prompts = [prompts[i] for i in holdout]
-    folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=PROMPT_SEED)
-    scores = cross_val_predict(
-        build_prompt_model(), development_prompts, y[development], cv=folds, method="predict_proba",
-    )[:, 1]
-    threshold = select_threshold(y[development], scores, beta=2)
+    scores = prompt_development_scores(development_prompts, y[development])
+    threshold = prompt_threshold(y[development], scores)
     reference = build_prompt_model().fit(development_prompts, y[development])
     truth = y[holdout]
     probes = {
@@ -97,7 +88,7 @@ def evaluate_prompt(model_dir: Path = AI_ROOT) -> dict:
         },
         "thresholdSelection": "Maximum F2 on five-fold stratified out-of-fold development scores. TF-IDF is fitted within each fold.",
         "baselines": [{
-            "name": "Constant score, always predict other content",
+            "id": "prompt_constant",
             "metrics": binary_metrics(truth, np.zeros_like(truth), np.zeros_like(truth)),
         }],
         "classroomProbes": probes,
@@ -148,7 +139,7 @@ def evaluate_activity(model_dir: Path = AI_ROOT) -> dict:
             "holdout": partition(truth, groups[holdout]),
         },
         "thresholdSelection": "Fixed at 0.5 before scoring the holdout.",
-        "baselines": [{"name": "At least three active edit bins", "metrics": binary_metrics(truth, rule, rule)}],
+        "baselines": [{"id": "activity_three_bins", "metrics": binary_metrics(truth, rule, rule)}],
         "limits": ["Simulator labels measure simulated editing. Quiet windows can include reading or planning."],
     }
 
@@ -164,11 +155,8 @@ def evaluate_forecast(model_dir: Path = AI_ROOT) -> dict:
     if not np.isfinite(x).all():
         raise ValueError("The CS1 sample produced non-finite features.")
     development, holdout = grouped_split(x, y, groups)
-    scores = cross_val_predict(
-        build_window_model(), x[development], y[development], groups=groups[development],
-        cv=GroupKFold(n_splits=4), method="predict_proba",
-    )[:, 1]
-    threshold = select_threshold(y[development], scores, beta=1)
+    scores = forecast_development_scores(x[development], y[development], groups[development])
+    threshold = forecast_threshold(y[development], scores)
     reference = build_window_model().fit(x[development], y[development])
     truth = y[holdout]
     bins = x[holdout, FEATURE_NAMES.index("active_edit_bins")]
@@ -198,8 +186,8 @@ def evaluate_forecast(model_dir: Path = AI_ROOT) -> dict:
         },
         "thresholdSelection": "Maximum F1 on four-fold GroupKFold out-of-fold development scores.",
         "baselines": [
-            {"name": "Ranking by active edit bins", "metrics": {"averagePrecision": float(average_precision_score(truth, bins))}},
-            {"name": "Constant score, always predict submission", "metrics": binary_metrics(truth, constant, constant)},
+            {"id": "active_bins_rank", "metrics": {"averagePrecision": float(average_precision_score(truth, bins))}},
+            {"id": "forecast_constant", "metrics": binary_metrics(truth, constant, constant)},
         ],
         "limits": [
             "Sampling can favor shorter learner logs. Opt-in logging gaps can hide activity.",

@@ -1,45 +1,59 @@
 from datetime import UTC, datetime
 from importlib.metadata import version
 import json
+from math import isclose
 from pathlib import Path
 import platform
+from shutil import copyfile
 from tempfile import TemporaryDirectory
 
+from classroom_probes import CLASSROOM_CASES
 
-REQUIRED_BASELINES = {
-    "prompt_content": {"Constant score, always predict other content"},
-    "editor_activity": {"At least three active edit bins"},
-    "first_submission": {"Ranking by active edit bins", "Constant score, always predict submission"},
+from .metrics import classification_metrics
+
+
+BASELINE_NAMES = {
+    "prompt_constant": "Constant score, always predict other content",
+    "activity_three_bins": "At least three active edit bins",
+    "active_bins_rank": "Ranking by active edit bins",
+    "forecast_constant": "Constant score, always predict submission",
+}
+TASK_REQUIREMENTS = {
+    "prompt_content": ("sh_content", None, {"prompt_constant"}),
+    "editor_activity": ("editing", "profiles", {"activity_three_bins"}),
+    "first_submission": ("submission_within_10_minutes", "learners", {"active_bins_rank", "forecast_constant"}),
 }
 
 
 def build_report(results: list[dict]) -> dict:
-    if len(results) != len(REQUIRED_BASELINES) or {item["task"] for item in results} != REQUIRED_BASELINES.keys():
+    if len(results) != len(TASK_REQUIREMENTS) or {item["task"] for item in results} != TASK_REQUIREMENTS.keys():
         raise ValueError("The report needs one result for each of the three served tasks.")
+    tasks = []
     for item in results:
         task = item["task"]
-        holdout = item["split"]["holdout"]
-        if {entry["name"] for entry in item["baselines"]} != REQUIRED_BASELINES[task]:
+        positive_label, group_unit, required_baselines = TASK_REQUIREMENTS[task]
+        if item["model"].get("positiveLabel") != positive_label:
+            raise ValueError(f"The report has an incorrect positive label for {task}.")
+        split = item["split"]
+        holdout = split["holdout"]
+        baselines = item["baselines"]
+        if len(baselines) != len(required_baselines) or {entry["id"] for entry in baselines} != required_baselines:
             raise ValueError(f"The report is missing a required baseline for {task}.")
-        if "counts" not in item["metrics"]:
-            raise ValueError(f"The served model needs confusion counts for {task}.")
-        for metrics in [item["metrics"], *(entry["metrics"] for entry in item["baselines"])]:
-            if not 0 <= metrics.get("averagePrecision", -1) <= 1:
-                raise ValueError(f"The report is missing valid AP for {task}.")
-            if "counts" in metrics:
-                counts = metrics["counts"]
-                if (
-                    set(counts) != {"tp", "fp", "tn", "fn"}
-                    or any(type(count) is not int or count < 0 for count in counts.values())
-                    or sum(counts.values()) != holdout["rows"]
-                    or counts["tp"] + counts["fn"] != holdout["positive"]
-                    or any(not 0 <= metrics.get(name, -1) <= 1 for name in ("precision", "recall", "f1"))
-                ):
-                    raise ValueError(f"The confusion counts do not match the holdout for {task}.")
+        validate_metrics(item["metrics"], holdout, task)
+        for entry in baselines:
+            validate_metrics(entry["metrics"], holdout, task, ranking_only=entry["id"] == "active_bins_rank")
         if item["parity"]["holdoutCount"] != holdout["rows"] or not item["parity"]["labelsMatch"]:
             raise ValueError(f"Artifact parity has not been verified for every holdout row of {task}.")
-        if task != "prompt_content" and item["split"].get("groupsDisjoint") is not True:
-            raise ValueError(f"Group separation has not been verified for {task}.")
+        if group_unit is not None:
+            if (
+                split.get("groupsDisjoint") is not True
+                or split.get("groupUnit") != group_unit
+                or any(not 0 < part.get("groups", 0) <= part["rows"] for part in (split["development"], holdout))
+            ):
+                raise ValueError(f"Group counts or separation are missing for {task}.")
+        else:
+            validate_probes(item.get("classroomProbes", {}))
+        tasks.append({**item, "baselines": [{**entry, "name": BASELINE_NAMES[entry["id"]]} for entry in baselines]})
     return {
         "schemaVersion": 1,
         "generatedAtUtc": datetime.now(UTC).isoformat(),
@@ -47,8 +61,33 @@ def build_report(results: list[dict]) -> dict:
             "python": platform.python_version(),
             **{name: version(name) for name in ("numpy", "scipy", "scikit-learn", "polars")},
         },
-        "tasks": results,
+        "tasks": tasks,
     }
+
+
+def validate_metrics(metrics: dict, holdout: dict, task: str, ranking_only: bool = False) -> None:
+    if not 0 <= metrics.get("averagePrecision", -1) <= 1:
+        raise ValueError(f"The report is missing valid AP for {task}.")
+    if ranking_only:
+        return
+    counts = metrics.get("counts", {})
+    if (
+        set(counts) != {"tp", "fp", "tn", "fn"}
+        or any(type(count) is not int or count < 0 for count in counts.values())
+        or sum(counts.values()) != holdout["rows"]
+        or counts["tp"] + counts["fn"] != holdout["positive"]
+    ):
+        raise ValueError(f"The confusion counts do not match the holdout for {task}.")
+    if any(not isclose(metrics.get(name, -1), expected) for name, expected in classification_metrics(counts).items()):
+        raise ValueError(f"The thresholded metrics do not match the confusion counts for {task}.")
+
+
+def validate_probes(probes: dict) -> None:
+    if probes.keys() != CLASSROOM_CASES.keys() or any(
+        counts.get("total") != len(CLASSROOM_CASES[name]) or not 0 <= counts.get("flagged", -1) <= counts["total"]
+        for name, counts in probes.items()
+    ):
+        raise ValueError("The report is missing complete classroom probe counts.")
 
 
 def markdown(report: dict) -> str:
@@ -98,7 +137,7 @@ def markdown(report: dict) -> str:
         if task["task"] == "first_submission":
             baseline_ap = next(
                 entry["metrics"]["averagePrecision"]
-                for entry in task["baselines"] if entry["name"] == "Ranking by active edit bins"
+                for entry in task["baselines"] if entry["id"] == "active_bins_rank"
             )
             delta = task["metrics"]["averagePrecision"] - baseline_ap
             lines.extend(["", f"AP difference from ranking by active edit bins: **{delta:+.4f}**."])
@@ -131,9 +170,33 @@ def write_reports(report: dict, output: Path) -> None:
         "evaluation.md": markdown(report),
     }
     output.mkdir(parents=True, exist_ok=True)
-    with TemporaryDirectory(dir=output) as working:
-        staging = Path(working)
-        for name, body in rendered.items():
-            (staging / name).write_text(body, encoding="utf-8")
-        for name in rendered:
-            (staging / name).replace(output / name)
+    lock = output / ".evaluation.lock"
+    try:
+        with lock.open("x"):
+            pass
+    except FileExistsError as error:
+        raise OSError(f"Another evaluation is publishing reports in {output}.") from error
+    try:
+        with TemporaryDirectory(dir=output) as working:
+            staging = Path(working)
+            for name, body in rendered.items():
+                (staging / name).write_text(body, encoding="utf-8")
+            publish_reports(staging, output)
+    finally:
+        lock.unlink()
+
+
+def publish_reports(staging: Path, output: Path) -> None:
+    structured = output / "evaluation.json"
+    backup = staging / "previous.json"
+    if structured.exists():
+        copyfile(structured, backup)
+    (staging / structured.name).replace(structured)
+    try:
+        (staging / "evaluation.md").replace(output / "evaluation.md")
+    except OSError:
+        if backup.exists():
+            backup.replace(structured)
+        else:
+            structured.unlink()
+        raise

@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test('rehearses the three model tasks through the local demo', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
+  await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'))
   await page.goto('/')
 
   const prompts = page.getByRole('region', { name: 'Prompt classification' })

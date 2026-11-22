@@ -1,19 +1,23 @@
 from copy import deepcopy
 import json
 from pathlib import Path
+from runpy import run_path
 from subprocess import run
 import sys
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from classroom_probes import CLASSROOM_CASES
 from cs1_submission_data import HEADER, load_windows
 from evaluation import binary_metrics
-from evaluation.metrics import assert_disjoint_groups, verify_parity
+from evaluation.metrics import verify_parity
 from evaluation.report import build_report, write_reports
+from experiment_protocol import assert_disjoint_groups
 
 
 AI_ROOT = Path(__file__).resolve().parents[1]
@@ -23,10 +27,10 @@ def simple_results():
     truth = np.array([0, 1])
     scores = np.array([0.1, 0.8])
     metrics = binary_metrics(truth, scores, scores >= 0.5)
-    baselines = [
-        ("prompt_content", ["Constant score, always predict other content"]),
-        ("editor_activity", ["At least three active edit bins"]),
-        ("first_submission", ["Ranking by active edit bins", "Constant score, always predict submission"]),
+    tasks = [
+        ("prompt_content", "sh_content", None, ["prompt_constant"]),
+        ("editor_activity", "editing", "profiles", ["activity_three_bins"]),
+        ("first_submission", "submission_within_10_minutes", "learners", ["active_bins_rank", "forecast_constant"]),
     ]
     return [
         {
@@ -35,24 +39,30 @@ def simple_results():
             "model": {
                 "modelVersion": f"{task}-fixture", "featureVersion": "fixture-features",
                 "artifact": "fixture.npz", "sha256": "0" * 64, "meaning": "A worked example.",
-                "positiveLabel": "positive", "evaluationStatus": "experimental",
+                "positiveLabel": label, "evaluationStatus": "experimental",
             },
             "dataset": {
                 "name": "Authored fixture", "revision": "1", "source": "Test fixture",
                 "checksum": {"scope": "fixture", "sha256": "0" * 64}, "unit": "row", "counts": {"rows": 4},
             },
             "split": {
-                "seed": 42, "policy": "Separate rows.", "groupsDisjoint": True, "groupUnit": "fixture groups",
-                "development": {"rows": 2, "positive": 1}, "holdout": {"rows": 2, "positive": 1},
+                "seed": 42, "policy": "Separate rows.", "groupsDisjoint": True, "groupUnit": group_unit,
+                "development": {"rows": 2, "positive": 1, "groups": 1},
+                "holdout": {"rows": 2, "positive": 1, "groups": 1},
             },
             "threshold": 0.5,
             "thresholdSelection": "Fixed.",
-            "metrics": metrics,
+            "metrics": deepcopy(metrics),
             "parity": verify_parity(scores, scores, 0.5, 0.5),
-            "baselines": [{"name": name, "metrics": {"averagePrecision": 0.5}} for name in names],
+            "baselines": [
+                {"id": key, "metrics": {"averagePrecision": 0.5} if key == "active_bins_rank" else deepcopy(metrics)}
+                for key in baseline_ids
+            ],
+            **({"classroomProbes": {name: {"flagged": 0, "total": len(cases)} for name, cases in CLASSROOM_CASES.items()}}
+               if group_unit is None else {}),
             "limits": ["Authored numbers for testing the report."],
         }
-        for task, names in baselines
+        for task, label, group_unit, baseline_ids in tasks
     ]
 
 
@@ -115,6 +125,69 @@ class EvaluationTests(unittest.TestCase):
             self.assertIn("prompt model export is missing", process.stderr)
             for filename in ("evaluation.json", "evaluation.md"):
                 self.assertEqual((output / filename).read_text(encoding="utf-8"), "previous complete report")
+
+    def test_report_requires_task_specific_evidence(self):
+        missing_probes = simple_results()
+        del missing_probes[0]["classroomProbes"]
+        with self.assertRaisesRegex(ValueError, "classroom probe counts"):
+            build_report(missing_probes)
+        missing_groups = simple_results()
+        del missing_groups[1]["split"]["holdout"]["groups"]
+        with self.assertRaisesRegex(ValueError, "Group counts or separation"):
+            build_report(missing_groups)
+        missing_baseline_counts = simple_results()
+        del missing_baseline_counts[2]["baselines"][1]["metrics"]["counts"]
+        with self.assertRaisesRegex(ValueError, "confusion counts"):
+            build_report(missing_baseline_counts)
+        wrong_precision = simple_results()
+        wrong_precision[0]["metrics"]["precision"] = 0.5
+        with self.assertRaisesRegex(ValueError, "thresholded metrics"):
+            build_report(wrong_precision)
+
+    def test_publication_failure_preserves_previous_report_pair(self):
+        original_replace = Path.replace
+
+        def replace(source, destination):
+            if source.name == "evaluation.md":
+                raise PermissionError("Markdown report is open in another application")
+            return original_replace(source, destination)
+
+        with TemporaryDirectory() as directory:
+            output = Path(directory)
+            names = {"evaluation.json", "evaluation.md"}
+            for filename in names:
+                (output / filename).write_text("previous report", encoding="utf-8")
+            with patch.object(Path, "replace", replace):
+                with self.assertRaisesRegex(PermissionError, "Markdown report"):
+                    write_reports(build_report(simple_results()), output)
+            self.assertEqual({path.name for path in output.iterdir()}, names)
+            for filename in names:
+                self.assertEqual((output / filename).read_text(encoding="utf-8"), "previous report")
+
+    def test_cli_writes_fixture_reports_and_reports_parity_failure(self):
+        script = str(AI_ROOT / "evaluate-models.py")
+        prompt, activity, forecast = simple_results()
+        with TemporaryDirectory() as directory:
+            output = Path(directory)
+            with (
+                patch.object(sys, "argv", [script, "--output", str(output)]),
+                patch("evaluation.tasks.evaluate_prompt", return_value=prompt),
+                patch("evaluation.tasks.evaluate_activity", return_value=activity),
+                patch("evaluation.tasks.evaluate_forecast", return_value=forecast) as score_forecast,
+                patch("sys.stdout"), patch("sys.stderr") as stderr,
+            ):
+                with self.assertRaises(SystemExit) as success:
+                    run_path(script, run_name="__main__")
+                self.assertEqual(success.exception.code, 0)
+                previous_reports = {path: path.read_bytes() for path in output.iterdir()}
+                self.assertEqual({path.name for path in previous_reports}, {"evaluation.md", "evaluation.json"})
+
+                score_forecast.side_effect = lambda _: verify_parity(np.array([0.8]), np.array([0.7]), 0.5, 0.5)
+                with self.assertRaises(SystemExit) as failure:
+                    run_path(script, run_name="__main__")
+                self.assertEqual(failure.exception.code, 1)
+                self.assertIn("The served artifact differs", "".join(call.args[0] for call in stderr.write.call_args_list))
+                self.assertEqual({path: path.read_bytes() for path in output.iterdir()}, previous_reports)
 
     def test_cs1_windows_use_pre_anchor_history_and_a_complete_exclusive_horizon(self):
         # Time-to-deadline decreases as time advances. Both eligible windows anchor at 960.
