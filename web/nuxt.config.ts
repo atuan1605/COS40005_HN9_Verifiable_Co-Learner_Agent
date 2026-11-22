@@ -25,11 +25,12 @@ export default defineNuxtConfig({
     },
   },
   css: ['~/assets/css/main.css'],
-  // A security run streams for minutes; the engine keeps its own 12-minute
-  // budget below this ceiling so it always closes the stream itself.
+  // A security run streams for minutes. Vercel allows at most 300 seconds on
+  // the Hobby plan, so the engine keeps its own shorter budget below this
+  // ceiling and always closes the stream itself.
   nitro: {
     vercel: {
-      functions: { maxDuration: 800 },
+      functions: { maxDuration: 300 },
     },
   },
   // Route changes (sign-in, workspace, admin) crossfade through the View

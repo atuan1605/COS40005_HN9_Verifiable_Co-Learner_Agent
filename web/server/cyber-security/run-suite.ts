@@ -24,8 +24,8 @@ const defaultConcurrency = 3
 const replyExcerptLength = 400
 
 // How long a run may keep scheduling cases before it closes the stream with
-// what it has. The Vercel function's own limit sits above this.
-export const injectionRunBudgetMs = 12 * 60_000
+// what it has. The Vercel function's 300-second limit sits above this.
+export const injectionRunBudgetMs = 4 * 60_000
 
 // Runs every case against the in-memory fixture world, three at a time, and
 // yields each finished case as it lands. Nothing the run touches is persisted.
