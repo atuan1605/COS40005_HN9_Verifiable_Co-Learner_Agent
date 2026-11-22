@@ -32,3 +32,11 @@ export {
   runInjectionSuite,
   type InjectionRunDeps,
 } from './run-suite'
+export {
+  CyberTestRecordNotFoundError,
+  handleDeleteRecordRequest,
+  handleRecordRequest,
+  handleRecordsRequest,
+  parseRecordId,
+  type CyberTestRecordsRequest,
+} from './handle-records'

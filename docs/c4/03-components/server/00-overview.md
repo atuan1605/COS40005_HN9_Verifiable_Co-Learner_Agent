@@ -50,7 +50,7 @@ flowchart LR
   db[("<b>Postgres</b>")]:::db
   llm["<b>LLM provider</b>"]:::ext
 
-  spa ==>|"POST /turn, POST /api/student,<br/>POST /api/submission, POST /api/admin,<br/>GET /api/admin/security-suite,<br/>POST /api/admin/security-run, GET /course-outline"| routes
+  spa ==>|"POST /turn, POST /api/student,<br/>POST /api/submission, POST /api/admin,<br/>GET /api/admin/security-suite,<br/>POST /api/admin/security-run,<br/>GET and DELETE /api/admin/security-records,<br/>GET /course-outline"| routes
   routes -->|"handleTurn, streamTurn"| turn
   routes -->|"handleAdmin"| admin
   routes -->|"handleSuiteRequest,<br/>handleRunRequest"| cyber
