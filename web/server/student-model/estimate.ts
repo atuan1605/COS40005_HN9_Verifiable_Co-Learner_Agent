@@ -1,12 +1,11 @@
 // Bayesian Knowledge Tracing over the evidence ledger. The estimate is a pure
 // function of the evidence: the same ledger always gives the same numbers.
-// The four parameters and the threshold are passed in. mastery-parameters.ts, in this
+// The parameters and the threshold are passed in. mastery-parameters.ts, in this
 // component, is the one place they are written down, so every module shares them.
 
 export interface MasteryParameters {
   prior: number
-  learning: number
-  byKind: Record<Observation['kind'], { slip: number, guess: number }>
+  byKind: Record<Observation['kind'], { slip: number, guess: number, learning: number }>
   threshold: number
 }
 
@@ -73,8 +72,7 @@ export function estimateMastery(
 
 // The posterior for one observation, then the learning step.
 function afterObservation(mastery: number, correct: boolean, parameters: MasteryParameters, kind: Observation['kind']): number {
-  const { slip, guess } = parameters.byKind[kind]
-  const { learning } = parameters
+  const { slip, guess, learning } = parameters.byKind[kind]
   const knew = correct ? mastery * (1 - slip) : mastery * slip
   const guessed = correct ? (1 - mastery) * guess : (1 - mastery) * (1 - guess)
   const evidenceWeight = knew + guessed

@@ -27,11 +27,11 @@ describe('quiz answer in Learn mode', () => {
     const store = memoryStore()
     const options = { quizAnswers: createMemoryQuizAnswerStore() }
     const first = await handleTurn(answer({ questionId: 'print-text', choice: 1 }), store, undefined, options)
-    expect(first.courseRoadmap[0]?.mastery).toBe(0.39)
+    expect(first.courseRoadmap[0]?.mastery).toBe(0.32)
 
     await handleTurn(answer({ questionId: 'comment-line', choice: 3 }), store, undefined, options)
     const third = await handleTurn(answer({ questionId: 'program-steps', choice: 0 }), store, undefined, options)
-    expect(third.courseRoadmap[0]).toMatchObject({ mastery: 0.92, state: 'open' })
+    expect(third.courseRoadmap[0]).toMatchObject({ mastery: 0.87, state: 'open' })
     expect(third.courseRoadmap[1]?.state).toBe('closed')
   })
 
