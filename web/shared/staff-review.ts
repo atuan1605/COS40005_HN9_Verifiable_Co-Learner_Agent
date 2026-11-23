@@ -1,5 +1,5 @@
 import type { Campus } from './campus'
-import type { PracticeTestResult } from './turn'
+import type { ModuleState, PracticeTestResult } from './turn'
 
 // What the staff review page shows about one student. Staff read it; a student
 // never does. Review signals are worked out when the page opens and are never
@@ -90,6 +90,14 @@ export interface ReviewLearningPattern {
   materialsSeconds: readonly { moduleId: string, seconds: number }[]
 }
 
+// One module's stored mastery (ADR 0008) as the owning lecturer sees it (ADR 0013).
+export interface ReviewModuleMastery {
+  moduleId: string
+  name: string
+  mastery: number
+  state: ModuleState
+}
+
 export interface StaffReview {
   student: ReviewedStudent
   courseId: string
@@ -100,6 +108,8 @@ export interface StaffReview {
   signals: ReviewSignal[]
   plans: ReviewPlan[]
   learningPattern: ReviewLearningPattern
+  // Each module's mastery, for the owning lecturer only; an administrator's review has none (ADR 0013).
+  mastery?: ReviewModuleMastery[]
 }
 
 export interface StaffAccessEntry {
