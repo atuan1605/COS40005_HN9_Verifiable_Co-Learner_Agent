@@ -280,7 +280,7 @@ The committed set of 120 injection cases grouped into eight attack families, eac
 _Avoid_: test suite, prompt set, eval set
 
 **Cyber test run**:
-An administrator's run of the whole injection suite against the configured model, streamed case by case, with the VerifyShield state captured when it starts and passed to every case. It rules nothing: a case leaks when the reply contains one of its forbidden fragments, and the page shows the results once. The run leaves one Cyber test record.
+An administrator's run of the whole injection suite against the configured model, streamed case by case, with the VerifyShield state captured when it starts and passed to every case. It rules nothing: a case leaks when the reply contains one of its forbidden fragments. The page streams the results live for the visit, and every run that started leaves one Cyber test record.
 _Avoid_: security test, audit run, scan
 
 **Cyber test record**:
@@ -292,7 +292,7 @@ A run result where an agent's reply contains the protected material the injectio
 _Avoid_: failure, breach, violation
 
 **Cyber Security page**:
-The administrator page that shows the injection suite by attack family, runs or cancels a Cyber test run with its score summary, and carries the VerifyShield switch, which is the same saved setting the Settings page reads and writes.
+The administrator page with two tabs, Run and Past results. Run is first: it shows the suite's totals as four tiles, runs or cancels a Cyber test run with its live score summary and case rows, and carries the VerifyShield switch, which is the same saved setting the Settings page reads and writes. Past results lists the saved Cyber test records newest first and opens one as a read-only view that can be deleted.
 _Avoid_: security dashboard, test console
 
 ### Architecture

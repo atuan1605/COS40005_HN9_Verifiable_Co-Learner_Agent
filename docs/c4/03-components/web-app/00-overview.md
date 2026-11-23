@@ -69,7 +69,8 @@ counted with the python runner component in [web-app/05-python-runner.md](05-pyt
 | From | To | What |
 |---|---|---|
 | pages (`index.vue`), ws (7 files, including `MaterialBlocks`), py (`protocol.ts`), helpers (`arrangement.ts`) | shared | `shared/turn.ts` types: `RedrawState`, `RoadmapModule`, `QuizQuestionView`, `MaterialBlock`, `ExerciseCheck`, ... |
-| pages (`admin/security.vue`) | shared | `shared/injection-suite.ts` types: `InjectionSuiteView`, `InjectionCaseEvent`, `InjectionRunEvent`, `InjectionAgent`, `InjectionRunProvider` |
+| pages (`admin/security.vue`) | shared | `shared/injection-suite.ts` types: `InjectionSuiteView`, `InjectionCaseEvent`, `InjectionRunEvent`, `InjectionAgent`, `InjectionRunProvider`, `CyberTestRecordListItem`, `CyberTestRecordDetail` |
+| components (`admin/CyberCaseRow.vue`) | shared | `shared/injection-suite.ts` types: `InjectionCaseEvent`, `InjectionAgent` |
 | ws (`ChatInline.vue`) | helpers | `InlineNode` from `workspace/chat-markdown.ts` |
 | py (`browser-runner.ts`) | py (`protocol.ts`) | `ToWorker`, `FromWorker` |
 

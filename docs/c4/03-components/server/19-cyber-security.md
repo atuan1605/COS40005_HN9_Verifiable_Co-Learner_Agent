@@ -213,17 +213,19 @@ page shows.
 The page does not wait for `done` to show totals. `securitySummary` in `shared/injection-suite.ts` is a pure
 function of the events that have arrived: passed, leaked, the number finished of the total, the per-category tally
 of the families reached, the model label, the start time and the duration so far. The score is the share of
-finished cases with no leak, and is null until one finishes. Nothing on the page is stored, so a reload starts
-blank; the run's record is kept server-side.
+finished cases with no leak, and is null until one finishes. The summary is live page state only, with its duration
+ticked by the browser clock, so a reload of a live run starts blank; what survives is the Cyber test record the stream
+close writes.
 
 ## Verified imports
 
 - Imports: runtime `requireProductOwner` from [`admin`](09-admin.md), `handleTurn` from [`turn`](02-turn.md),
   `createFakeSandbox` from [`sandbox`](14-sandbox.md), `createMemoryUnlockStore` from
   [`student-model`](05-student-model.md), `courseFromSpec` from [`course`](04-course.md), and the memory
-  conversation and course stores from [`storage`](08-storage.md). Types only from [`agents`](06-agents.md)
-  (`Agents`), [`sandbox`](14-sandbox.md) (`Sandbox`), [`storage`](08-storage.md) (`CyberTestRecordStore`) and
-  [`shared`](../shared.md) (the suite view, run events, category ids, agent and labels). External:
+  conversation and course stores from [`storage`](08-storage.md). From [`shared`](../shared.md), runtime
+  `injectionCategoryIds`, `injectionCategoryLabels` and `securitySummary`, and types only for the suite view, run
+  events, category ids and agent. Types only from [`agents`](06-agents.md) (`Agents`), [`sandbox`](14-sandbox.md) (`Sandbox`) and
+  [`storage`](08-storage.md) (`CyberTestRecordStore`). External:
   `zod` and `yaml`. The suite asset is read by the routes, not here.
 - Runtime importers, all through `index.ts`: `api/admin/security-suite.get.ts` (`handleSuiteRequest`,
   `InjectionSuiteInvalidError`), `api/admin/security-run.post.ts` (`handleRunRequest`, `runInjectionSuite`,
