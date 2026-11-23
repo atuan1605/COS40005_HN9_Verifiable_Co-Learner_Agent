@@ -4,7 +4,9 @@ import { createMemoryModelSettingsStore } from '../server/storage/model-settings
 import { createMemoryCourseStore } from '../server/storage/course-store'
 import { createMemorySubmissionStore } from '../server/storage/submission-store'
 import { createMemoryStaffAccessLog } from '../server/storage/staff-access-log'
-import { createMemoryStaffReviewStore, type StaffReviewStudent } from '../server/storage/staff-review-store'
+import { createMemoryStaffReviewStore, type MemoryStaffReviewData, type StaffReviewStudent } from '../server/storage/staff-review-store'
+import { pythonCourse } from '../server/course'
+import { createMemoryEvidenceStore, learningParameters } from '../server/student-model'
 import { handleStaffReview } from '../server/staff-review'
 import type { LearningPlan } from '../server/learning-plan'
 import type { ReviewEvent } from '../shared/staff-review'
@@ -24,7 +26,7 @@ const events: ReviewEvent[] = [
   { id: 2, type: 'submitted', time: '2026-11-19T08:01:00Z', payload: { moduleId: 'loops', exerciseId: 'sum', testsPassed: 3, testsTotal: 3 } },
 ]
 
-function setup() {
+function setup(extra: Partial<MemoryStaffReviewData> = {}) {
   const store = createMemoryStaffReviewStore({
     students: [an, binh],
     courses: [
@@ -32,6 +34,13 @@ function setup() {
       { id: 'other_course', ownerEmail: 'other@example.com', enrolled: ['binh-id'] },
     ],
     activity: { 'an-id': events },
+    // A complete picture: every module of the course has a stored row.
+    masteries: {
+      'an-id': pythonCourse.modules.map(module => module.id === 'getting_started'
+        ? { moduleId: module.id, mastery: 0.97, passedExercise: true, everMastered: true }
+        : { moduleId: module.id, mastery: module.id === 'variables' ? 0.4 : 0, passedExercise: false, everMastered: false }),
+    },
+    ...extra,
     learningPlans: { 'an-id': plans },
     submissions: {
       'an-id': [{
@@ -154,6 +163,60 @@ describe('staff review handler', () => {
 
     expect(second.signals).toEqual(first.signals)
     expect(await parts.store.activity('an-id', 'intro_python')).toEqual(events)
+  })
+})
+
+describe('the mastery a review shows', () => {
+  it('shows the owning lecturer the stored mastery and state of each module', async () => {
+    const review = await open('lecturer@example.com', 'SWB0001').result
+
+    expect(review.mastery?.slice(0, 3)).toEqual([
+      { moduleId: 'getting_started', name: expect.any(String), mastery: 0.97, state: 'mastered' },
+      { moduleId: 'variables', name: expect.any(String), mastery: 0.4, state: 'open' },
+      { moduleId: 'strings', name: expect.any(String), mastery: 0, state: 'closed' },
+    ])
+  })
+
+  it('still writes the staff access log when the lecturer reads mastery', async () => {
+    const { result, parts } = open('lecturer@example.com', 'SWB0001')
+    await result
+    expect(parts.accessLog.rows).toMatchObject([{ actorRole: 'lecturer', studentId: 'an-id', opened: 'student_review' }])
+  })
+
+  it('refuses another lecturer the mastery of a student outside their courses', async () => {
+    await expect(open('other@example.com', 'SWB0001').result).rejects.toMatchObject({ statusCode: 403 })
+  })
+
+  it('opens a module whose unlock was recorded, as the student\'s roadmap does', async () => {
+    const review = await open('lecturer@example.com', 'SWB0001', setup({ unlocks: { 'an-id': ['strings'] } })).result
+    expect(review.mastery?.find(module => module.moduleId === 'strings')?.state).toBe('open')
+  })
+
+  it('rebuilds missing mastery rows from evidence instead of reading them as zero', async () => {
+    const parts = setup({ masteries: {} })
+    const evidence = { ...createMemoryEvidenceStore(), forStudent: async () => [
+      { moduleId: 'getting_started', kind: 'submission' as const, exerciseId: pythonCourse.modules[0]!.exerciseIds[0]!, allPassed: true, time: '2026-11-19T08:00:00Z' },
+    ] }
+    const review = await handleStaffReview({
+      email: 'lecturer@example.com', adminEmails, lecturerEmails, studentNumber: 'SWB0001', store: parts.store, accessLog: parts.accessLog,
+      courses: createMemoryCourseStore(), patternSources: () => ({ submissions: parts.submissions, evidence }),
+    })
+    // Rebuilt from the passing submission: above the prior, and the exercise counts as passed.
+    expect(review.mastery?.[0]?.mastery).toBeGreaterThan(learningParameters.prior)
+    expect(review.mastery?.[1]?.mastery).toBe(learningParameters.prior)
+  })
+
+  it('shows mastery to an administrator who also owns the student\'s course', async () => {
+    const parts = setup()
+    const review = await handleStaffReview({
+      email: 'lecturer@example.com', adminEmails: 'lecturer@example.com', lecturerEmails, studentNumber: 'SWB0001', store: parts.store, accessLog: parts.accessLog, ...reading(parts.submissions),
+    })
+    expect(review.mastery?.[0]).toMatchObject({ moduleId: 'getting_started', state: 'mastered' })
+  })
+
+  it('hands the administrator no mastery', async () => {
+    const review = await open('owner@example.com', 'SWB0001').result
+    expect(review).not.toHaveProperty('mastery')
   })
 })
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import BusySpinner from '../BusySpinner.vue'
 import type { ProgressView, RoadmapModule } from '#shared/turn'
+import { courseProgress } from '#shared/course-progress'
 import ProgressPanel from './ProgressPanel.vue'
 
 const props = defineProps<{
@@ -23,7 +24,8 @@ function onHover(event: PointerEvent, module: RoadmapModule) {
   emit('prefetchModule', module.id)
 }
 
-const masteredCount = computed(() => props.modules.filter(module => module.state === 'mastered').length)
+// Modules listed without content stay out of the total, so 100% is reachable.
+const progressSummary = computed(() => courseProgress(props.modules))
 const thresholdPercent = computed(() => Math.round(props.masteryThreshold * 100))
 
 // A closed module shows no mastery, so only an unlocked one reaches the bar.
@@ -68,9 +70,28 @@ function cardClass(module: RoadmapModule): string {
         <h2 class="text-xs leading-4 font-semibold tracking-[-0.2px] text-ink-800">
           Course roadmap
         </h2>
-        <p class="shrink-0 font-mono text-[10px] leading-[15px] text-ink-400">
-          {{ masteredCount }}/{{ modules.length }} modules mastered
-        </p>
+        <!-- On lg the count and the bar share one line, so the header keeps h-14 like its neighbours. -->
+        <div class="flex min-w-0 shrink-0 flex-col gap-1 md:max-lg:w-full lg:w-full lg:flex-row lg:items-center lg:gap-2">
+          <p class="shrink-0 font-mono text-[10px] leading-[15px] text-ink-400">
+            {{ progressSummary.mastered }}/{{ progressSummary.total }} modules mastered
+          </p>
+          <div class="flex min-w-0 items-center gap-2 lg:flex-1">
+            <div
+              class="h-1.5 min-w-12 flex-1 overflow-hidden rounded-full bg-ink-100"
+              role="progressbar"
+              aria-label="Course progress"
+              :aria-valuenow="progressSummary.percent"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            >
+              <div
+                class="h-full rounded-full bg-brand-500 transition-[width]"
+                :style="{ width: `${progressSummary.percent}%` }"
+              />
+            </div>
+            <span class="font-mono text-[10px] leading-[15px] text-ink-500">{{ progressSummary.percent }}%</span>
+          </div>
+        </div>
       </div>
       <ul class="flex flex-col gap-1.5 md:max-lg:flex-row md:max-lg:flex-nowrap">
         <template

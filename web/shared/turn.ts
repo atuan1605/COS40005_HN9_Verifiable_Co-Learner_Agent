@@ -6,6 +6,9 @@ interface RoadmapModuleBase {
   part: string
   summary: string
   current: boolean
+  // False for a module the course spec lists without content; it counts
+  // towards no Course progress.
+  available: boolean
 }
 
 // An unlocked module carries the mastery the student is shown, from 0 to 1,

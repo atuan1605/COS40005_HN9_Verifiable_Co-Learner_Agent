@@ -1,9 +1,11 @@
-import type { CoursePreview, LecturerResponse } from '../../shared/lecturer'
+import { courseProgress } from '../../shared/course-progress'
+import type { CoursePreview, LecturerCourse, LecturerResponse } from '../../shared/lecturer'
 import { campusRule, isCampus } from '../../shared/campus'
 import { defaultCourseId, parseCourseSpec, type CourseSpec } from '../course'
 import type { CourseImageStore } from '../storage/course-image-store'
-import type { MasteryRecalculator } from '../student-model'
-import type { LecturerStore } from '../storage/lecturer-store'
+import { moduleStandings, needsEvidence, type EvidenceStore, type MasteryRecalculator } from '../student-model'
+import { createMemoryCourseStore, type CourseStore } from '../storage/course-store'
+import type { LecturerCourseRecord, LecturerStore } from '../storage/lecturer-store'
 import { coursePreview } from './preview-course'
 
 interface LecturerIdentity {
@@ -35,6 +37,10 @@ export async function handleLecturer(request: LecturerIdentity & {
   // Stored mastery is recomputed for every enrolled student, because whether a module is
   // mastered is judged against the current threshold (ADR 0008). Absent in tests of the answer alone.
   recalculate?: MasteryRecalculator
+  // The course as the student's roadmap reads it, and the ledger a student's missing mastery rows
+  // and legacy unlocks are rebuilt from, so Course progress matches the roadmap.
+  courses?: CourseStore
+  evidence?: (courseId: string) => EvidenceStore
 }): Promise<LecturerResponse> {
   const email = requireLecturer(request)
   const campus = request.campus ?? ''
@@ -54,9 +60,33 @@ export async function handleLecturer(request: LecturerIdentity & {
     }
     await request.recalculate?.forCourse(change.courseId)
   }
-  const courses = await request.store.forLecturer(email)
+  const courses = await Promise.all((await request.store.forLecturer(email))
+    .map(record => withProgress(record, request.courses ?? createMemoryCourseStore(), request.evidence)))
   if (campus === '') return { courses }
   return { courses: courses.map(course => ({ ...course, students: course.students.filter(student => student.campus === campus) })) }
+}
+
+// Course progress for each enrolled student of an owned course, from the same stored mastery the
+// student and the agents read (ADR 0013), judged by the roadmap's own module states: recorded and
+// legacy unlocks count, and missing rows are rebuilt from evidence. The stored rows are not sent.
+async function withProgress(
+  { students, ...course }: LecturerCourseRecord,
+  courses: CourseStore,
+  evidence: ((courseId: string) => EvidenceStore) | undefined,
+): Promise<LecturerCourse> {
+  const studied = await courses.course(course.id)
+  const ledger = evidence?.(course.id)
+  return {
+    ...course,
+    students: await Promise.all(students.map(async ({ id, masteries, unlocks, ...student }) => {
+      const observations = ledger && needsEvidence(studied, masteries) ? await ledger.forStudent(id) : []
+      const standings = moduleStandings(studied, { stored: masteries, evidence: observations, recordedUnlocks: unlocks })
+      return {
+        ...student,
+        progress: courseProgress(studied.modules.map((module, index) => ({ available: module.available, state: standings[index]!.state }))),
+      }
+    })),
+  }
 }
 
 interface CourseSpecRequest extends LecturerIdentity {

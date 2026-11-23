@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { handleCourseImage, handleCourseSpec, handleLecturer } from '../server/lecturer/handle-lecturer'
-import { pythonCourseSpec, type CourseSpec } from '../server/course'
+import { pythonCourse, pythonCourseSpec, type Course, type CourseSpec } from '../server/course'
 import { createMemoryCourseImageStore } from '../server/storage/course-image-store'
+import { createMemoryCourseStore } from '../server/storage/course-store'
 import { createMemoryLecturerStore } from '../server/storage/lecturer-store'
+import { createMemoryEvidenceStore, type EvidenceStore, type TimedObservation } from '../server/student-model'
 
 const lecturerEmails = 'other@example.com, LECTURER@example.com'
 const title = 'Introduction to Programming with Python'
@@ -47,7 +49,14 @@ describe('lecturer handler', () => {
     ])
 
     await expect(handleLecturer({ email: 'Lecturer@example.com', lecturerEmails, store })).resolves.toEqual({
-      courses: [{ id: 'intro_python', title, enrolledCount: 2, masteryThreshold: 0.9, history: [seeded], students }],
+      courses: [{
+        id: 'intro_python',
+        title,
+        enrolledCount: 2,
+        masteryThreshold: 0.9,
+        history: [seeded],
+        students: students.map(student => ({ ...student, progress: { mastered: 0, total: pythonCourse.modules.filter(module => module.available).length, percent: 0 } })),
+      }],
     })
   })
 
@@ -68,6 +77,102 @@ describe('lecturer handler', () => {
 
     expect((await handleLecturer({ ...request, campus: '' })).courses[0]!.students).toHaveLength(2)
     await expect(handleLecturer({ ...request, campus: 'Mars' })).rejects.toMatchObject({ statusCode: 400 })
+  })
+
+  // Each passed exercise is one observation, so a module gets enough distinct exercises to be mastered.
+  const exercisesOf = (moduleId: string) => Array.from({ length: 12 }, (_, index) => `${moduleId}_ex${index}`)
+  // Three modules have content; the fourth is listed without content and never counts.
+  const small = (extra: Partial<Course> = {}): Course => ({
+    ...pythonCourse,
+    modules: ['m1', 'm2', 'm3', 'm4'].map((id, index) => ({
+      id, number: index + 1, name: id, part: '', summary: '', available: id !== 'm4', keywords: [], exerciseIds: exercisesOf(id), questionIds: [],
+    })),
+    ...extra,
+  })
+  const row = (moduleId: string, mastery: number, passedExercise: boolean) => ({ moduleId, mastery, passedExercise, everMastered: passedExercise && mastery >= 0.9 })
+  const passes = (moduleId: string, count: number, time = '2026-11-20T08:00:00Z'): TimedObservation[] =>
+    exercisesOf(moduleId).slice(0, count).map(exerciseId => ({ moduleId, kind: 'submission' as const, exerciseId, allPassed: true, time }))
+  const ledger = (byStudent: Record<string, TimedObservation[]>) => (): EvidenceStore => ({
+    ...createMemoryEvidenceStore(),
+    async forStudent(id) { return byStudent[id] ?? [] },
+  })
+
+  it('counts a module mastered only once it is unlocked, as the roadmap does, and counts recorded unlocks', async () => {
+    // m1 was never mastered, so m2 at the threshold is closed on the roadmap unless its unlock was recorded.
+    const masteries = [row('m1', 0.5, true), { ...row('m2', 0.95, true), everMastered: false }, row('m3', 0, false), row('m4', 0, false)]
+    const store = createMemoryLecturerStore([{
+      ...python,
+      students: [{ ...students[0]!, masteries }, { ...students[1]!, masteries, unlocks: ['m2'] }],
+    }])
+
+    const response = await handleLecturer({ email: 'lecturer@example.com', lecturerEmails, store, courses: createMemoryCourseStore([small()]) })
+
+    expect(response.courses[0]!.students.map(student => student.progress.mastered)).toEqual([0, 1])
+  })
+
+  it('rebuilds a student\'s missing mastery rows from evidence instead of reading them as zero', async () => {
+    const store = createMemoryLecturerStore([{ ...python, students: [{ ...students[0]!, id: 'an-id', masteries: [] }] }])
+
+    const response = await handleLecturer({
+      email: 'lecturer@example.com',
+      lecturerEmails,
+      store,
+      courses: createMemoryCourseStore([small()]),
+      evidence: ledger({ 'an-id': passes('m1', 12) }),
+    })
+
+    expect(response.courses[0]!.students[0]!.progress).toEqual({ mastered: 1, total: 3, percent: 33 })
+  })
+
+  it('keeps the unlocks the earlier threshold gave, as the roadmap does', async () => {
+    const course = small({ masteryThreshold: 0.99, legacyUnlocks: { before: '2026-11-21T00:00:00Z', threshold: 0.5 } })
+    // m1 never reaches 0.99, so only the legacy unlock under 0.5 opens m2, which is mastered.
+    const store = createMemoryLecturerStore([{
+      ...python,
+      students: [{ ...students[0]!, id: 'an-id', masteries: [row('m1', 0.6, true), { ...row('m2', 0.995, true), everMastered: true }, row('m3', 0, false), row('m4', 0, false)] }],
+    }])
+
+    const response = await handleLecturer({
+      email: 'lecturer@example.com',
+      lecturerEmails,
+      store,
+      courses: createMemoryCourseStore([course]),
+      evidence: ledger({ 'an-id': passes('m1', 3) }),
+    })
+
+    expect(response.courses[0]!.students[0]!.progress.mastered).toBe(1)
+  })
+
+  it('shows each enrolled student\'s Course progress for an owned course, from stored mastery', async () => {
+    const store = createMemoryLecturerStore([
+      {
+        ...python,
+        students: [
+          // Two mastered; m3 is at the threshold but has no passed exercise, so it is not mastered.
+          { ...students[0]!, masteries: [row('m1', 0.95, true), row('m2', 0.91, true), row('m3', 0.92, false), row('m4', 0, false)] },
+          { ...students[1]!, masteries: [row('m1', 0.4, true), row('m2', 0, false), row('m3', 0, false), row('m4', 0, false)] },
+        ],
+      },
+      {
+        ownerEmail: 'other@example.com',
+        id: 'other',
+        title: 'Other course',
+        enrolledCount: 1,
+        masteryThreshold: 0.9,
+        history: [],
+        students: [{ displayName: 'Elsewhere', studentNumber: 'SWB0009', campus: null, email: 'else@example.com', enrolledAt: '2026-11-14T09:00:00Z', masteries: [row('m1', 0.99, true)] }],
+      },
+    ])
+
+    const response = await handleLecturer({ email: 'lecturer@example.com', lecturerEmails, store, courses: createMemoryCourseStore([small()]) })
+
+    expect(response.courses.map(course => course.id)).toEqual(['intro_python'])
+    expect(response.courses[0]!.students.map(student => [student.email, student.progress])).toEqual([
+      ['an@example.com', { mastered: 2, total: 3, percent: 66 }],
+      ['binh@example.com', { mastered: 0, total: 3, percent: 0 }],
+    ])
+    expect(JSON.stringify(response)).not.toContain('masteries')
+    expect(JSON.stringify(response)).not.toContain('else@example.com')
   })
 
   it.each([0.49, 1, NaN, '0.8'])('rejects invalid threshold %s before writing', async (threshold) => {

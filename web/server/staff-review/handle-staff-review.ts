@@ -1,4 +1,5 @@
-import type { ReviewEvent, ReviewPlan, StaffReview } from '../../shared/staff-review'
+import type { ReviewEvent, ReviewModuleMastery, ReviewPlan, StaffReview } from '../../shared/staff-review'
+import { moduleStandings, needsEvidence, type TimedObservation } from '../student-model'
 import type { StaffAccessLog, StaffAccessRole } from '../storage/staff-access-log'
 import type { StaffReviewStore } from '../storage/staff-review-store'
 import { defaultCourseId, type Course } from '../course'
@@ -43,11 +44,14 @@ export async function handleStaffReview(request: StaffReviewRequest): Promise<St
   const student = await request.store.studentByNumber(request.studentNumber.trim())
   let actorRole: StaffAccessRole
   let courseId: string
+  // Owning the student's course grants the mastery view, whatever other role the person has (ADR 0013).
+  let ownsCourse = false
   if (role.productOwner) {
     if (!student) throw new StaffReviewError(404, 'Student not found')
     actorRole = 'administrator'
     // The Python course is the only course in sprint 2.
     courseId = defaultCourseId
+    ownsCourse = role.lecturer && await request.store.ownedCourseOf(email, student.id) === courseId
   }
   else {
     // A student who does not exist and one who is not theirs are refused alike.
@@ -55,6 +59,7 @@ export async function handleStaffReview(request: StaffReviewRequest): Promise<St
     if (!student || owned === null) throw new StaffReviewError(403, 'That student is not enrolled in a course you own')
     actorRole = 'lecturer'
     courseId = owned
+    ownsCourse = true
   }
 
   await request.accessLog.record({ actorEmail: email, actorRole, studentId: student.id, courseId, opened: 'student_review' })
@@ -68,6 +73,10 @@ export async function handleStaffReview(request: StaffReviewRequest): Promise<St
     gatherLearningPattern(request.patternSources(courseId), student.id, course),
   ])
   const signals = reviewSignals(events)
+  // Mastery is read for the owning lecturer only; an administrator who does not own the course never sees it (ADR 0013).
+  const mastery = ownsCourse
+    ? { mastery: await reviewMastery(request, student.id, courseId, course) }
+    : {}
   return {
     student: { displayName: student.displayName, studentNumber: student.studentNumber, campus: student.campus, email: student.email },
     courseId,
@@ -77,7 +86,27 @@ export async function handleStaffReview(request: StaffReviewRequest): Promise<St
     signals,
     plans: reviewPlans(plans, course),
     learningPattern,
+    ...mastery,
   }
+}
+
+// Each module of the course with its stored mastery and the state the student's roadmap shows it in.
+// Missing rows are rebuilt from evidence and recorded unlocks count, so the numbers match the roadmap.
+async function reviewMastery(request: StaffReviewRequest, studentId: string, courseId: string, course: Course): Promise<ReviewModuleMastery[]> {
+  const [stored, recordedUnlocks] = await Promise.all([
+    request.store.masteries(studentId, courseId),
+    request.store.unlocks(studentId, courseId),
+  ])
+  const evidence: TimedObservation[] = needsEvidence(course, stored)
+    ? await request.patternSources(courseId).evidence?.forStudent(studentId) ?? []
+    : []
+  const standings = moduleStandings(course, { stored, evidence, recordedUnlocks })
+  return course.modules.map((module, index) => ({
+    moduleId: module.id,
+    name: module.name,
+    mastery: standings[index]!.mastery,
+    state: standings[index]!.state,
+  }))
 }
 
 // The plans by module, every revision of each, oldest first, with each step in words.
