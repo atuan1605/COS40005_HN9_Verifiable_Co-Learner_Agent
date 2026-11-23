@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Campus } from '../../shared/campus'
+import type { CourseSpec } from '../course'
+import type { StoredMastery } from '../student-model'
 import type { LecturerStore } from './lecturer-store'
 
 export function createSupabaseLecturerStore({ url, secretKey }: {
@@ -50,11 +52,11 @@ export function createSupabaseLecturerStore({ url, secretKey }: {
       return result.data === true
     },
     async forLecturer(email) {
-      const courses = await supabase.from('courses').select('id, title, masteryThreshold:spec->masteryThreshold')
+      const courses = await supabase.from('courses').select('id, title, spec, masteryThreshold:spec->masteryThreshold')
         .eq('owner_email', email).order('title').order('id')
       if (courses.error) throw new Error(courses.error.message)
 
-      return Promise.all(courses.data.map(async ({ id, title, masteryThreshold }) => {
+      return Promise.all(courses.data.map(async ({ id, title, spec, masteryThreshold }) => {
         if (typeof masteryThreshold !== 'number') throw new Error('The course has no mastery threshold.')
         const [enrollments, history] = await Promise.all([
           supabase.from('enrollments').select('student_id, enrolled_at').eq('course_id', id),
@@ -63,11 +65,14 @@ export function createSupabaseLecturerStore({ url, secretKey }: {
         ])
         if (enrollments.error) throw new Error(enrollments.error.message)
         if (history.error) throw new Error(history.error.message)
-        const students = await studentsIn(enrollments.data.map(row => row.student_id))
+        const studentIds = enrollments.data.map(row => row.student_id)
+        const [students, masteries] = await Promise.all([studentsIn(studentIds), masteriesIn(id, studentIds)])
         return {
           id,
           title,
           masteryThreshold,
+          // A module has content exactly when its spec gives it content (Course progress counts only those).
+          modules: ((spec as CourseSpec | null)?.modules ?? []).map(module => ({ id: module.id, available: module.content !== undefined })),
           enrolledCount: enrollments.data.length,
           history: history.data.map(row => ({
             action: row.action,
@@ -82,10 +87,27 @@ export function createSupabaseLecturerStore({ url, secretKey }: {
             email: student.email,
             campus: student.campus,
             enrolledAt: enrollments.data.find(row => row.student_id === student.id)?.enrolled_at ?? '',
+            masteries: masteries.get(student.id) ?? [],
           })),
         }
       }))
     },
+  }
+
+  // The stored mastery rows (ADR 0008) of the course's enrolled students, read only for an owned course.
+  async function masteriesIn(courseId: string, ids: string[]): Promise<Map<string, StoredMastery[]>> {
+    const byStudent = new Map<string, StoredMastery[]>()
+    if (ids.length === 0) return byStudent
+    const result = await supabase.from('module_masteries')
+      .select('student_id, module_id, mastery, passed_exercise, ever_mastered')
+      .eq('course_id', courseId).in('student_id', ids)
+    if (result.error) throw new Error(result.error.message)
+    for (const row of result.data) {
+      const rows = byStudent.get(row.student_id) ?? []
+      rows.push({ moduleId: row.module_id, mastery: row.mastery, passedExercise: row.passed_exercise, everMastered: row.ever_mastered })
+      byStudent.set(row.student_id, rows)
+    }
+    return byStudent
   }
 
   async function studentsIn(ids: string[]): Promise<{ id: string, displayName: string, studentNumber: string, email: string, campus: Campus | null }[]> {

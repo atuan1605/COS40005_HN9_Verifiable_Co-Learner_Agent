@@ -1,4 +1,5 @@
 import type { Campus } from './campus'
+import type { CourseProgress } from './course-progress'
 import type { ExerciseCheck, ModuleMaterials } from './turn'
 
 export interface CourseHistoryEntry {
@@ -15,6 +16,8 @@ export interface LecturerStudent {
   campus: Campus | null
   email: string
   enrolledAt: string
+  // Derived from the student's stored mastery for this course (ADR 0013); never stored.
+  progress: CourseProgress
 }
 
 export interface LecturerCourse {

@@ -709,6 +709,14 @@ describe('admin student numbers', () => {
     expect(viewed.students).toEqual([an, binh])
   })
 
+  it('shows the administrator no mastery or Course progress (ADR 0013: lecturer only)', async () => {
+    const students = createMemoryStudentDirectoryStore([an, binh])
+
+    const viewed = await handleAdmin(ownerRequest({ students, body: { event: 'students' } }))
+
+    expect(JSON.stringify(viewed)).not.toMatch(/mastery|progress/i)
+  })
+
   it('reads the directory only when the request asks for it', async () => {
     const decisions = createMemoryDecisionLogStore()
     await decisions.append(loggedDecision({ turnId: 'read-back' }))

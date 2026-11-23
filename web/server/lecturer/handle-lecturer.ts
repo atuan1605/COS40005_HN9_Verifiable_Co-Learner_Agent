@@ -1,9 +1,10 @@
-import type { CoursePreview, LecturerResponse } from '../../shared/lecturer'
+import { courseProgress } from '../../shared/course-progress'
+import type { CoursePreview, LecturerCourse, LecturerResponse } from '../../shared/lecturer'
 import { campusRule, isCampus } from '../../shared/campus'
 import { defaultCourseId, parseCourseSpec, type CourseSpec } from '../course'
 import type { CourseImageStore } from '../storage/course-image-store'
 import type { MasteryRecalculator } from '../student-model'
-import type { LecturerStore } from '../storage/lecturer-store'
+import type { LecturerCourseRecord, LecturerStore } from '../storage/lecturer-store'
 import { coursePreview } from './preview-course'
 
 interface LecturerIdentity {
@@ -54,9 +55,26 @@ export async function handleLecturer(request: LecturerIdentity & {
     }
     await request.recalculate?.forCourse(change.courseId)
   }
-  const courses = await request.store.forLecturer(email)
+  const courses = (await request.store.forLecturer(email)).map(withProgress)
   if (campus === '') return { courses }
   return { courses: courses.map(course => ({ ...course, students: course.students.filter(student => student.campus === campus) })) }
+}
+
+// Course progress for each enrolled student of an owned course, from the same stored mastery the
+// student and the agents read (ADR 0013). A module counts as mastered at the threshold with a passed
+// exercise, as on the student's roadmap. The stored rows themselves are not sent.
+function withProgress({ modules, students, ...course }: LecturerCourseRecord): LecturerCourse {
+  return {
+    ...course,
+    students: students.map(({ masteries, ...student }) => ({
+      ...student,
+      progress: courseProgress(modules.map((module) => {
+        const row = masteries.find(item => item.moduleId === module.id)
+        const mastered = row !== undefined && row.passedExercise && row.mastery >= course.masteryThreshold
+        return { available: module.available, state: mastered ? 'mastered' as const : 'open' as const }
+      })),
+    })),
+  }
 }
 
 interface CourseSpecRequest extends LecturerIdentity {
