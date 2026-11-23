@@ -87,10 +87,10 @@ describe('stored mastery in a turn', () => {
     }, store, undefined, options)
 
     // One correct answer on a module nothing else has touched: the posterior for a
-    // pass with guess 0.25 and slip 0.1 is 2/7, and the learning step adds 3/28 of
-    // the rest, so 11/28.
+    // pass with guess 0.25 and slip 0.1 is 2/7, and the quiz learning step of 0.05
+    // adds 1/28, so 9/28.
     const stored = await storedOf(firstModule)
-    expect(stored!.mastery).toBeCloseTo(11 / 28, 12)
+    expect(stored!.mastery).toBeCloseTo(9 / 28, 12)
     expect(answered.courseRoadmap.find(module => module.id === firstModule)!.mastery).toBe(shown(stored!.mastery))
   })
 
