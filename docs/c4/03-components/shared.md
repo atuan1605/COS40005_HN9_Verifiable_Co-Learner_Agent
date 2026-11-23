@@ -32,6 +32,7 @@ flowchart LR
   video["<b>MaterialVideo.vue</b>"]:::near
   cyber["<b>server/cyber-security</b>"]:::near
   securityPage["<b>admin/security.vue</b>"]:::near
+  caseRow["<b>admin/CyberCaseRow.vue</b>"]:::near
 
   routes -->|"sessionStudentId,<br/>sessionEmail"| studentId
   pagesmw -->|"studentIdFromAuth,<br/>sessionStudentId"| studentId
@@ -41,9 +42,11 @@ flowchart LR
   typeUsers -.->|"types"| turnTypes
   prompts -->|"materialsText"| materials
   video -->|"videoEmbed"| materials
-  cyber -->|"injectionCategoryIds,<br/>injectionCategoryLabels"| injection
+  cyber -->|"injectionCategoryIds,<br/>injectionCategoryLabels,<br/>securitySummary"| injection
   securityPage -->|"securitySummary"| injection
   securityPage -.->|"types"| injection
+  caseRow -->|"injectionCategoryLabels"| injection
+  caseRow -.->|"types"| injection
   materials -.->|"type: MaterialBlock,<br/>ModuleMaterials"| turnTypes
 
   style shared fill:none,stroke:#8b949e,stroke-dasharray:5 4
@@ -69,7 +72,7 @@ flowchart LR
 - `agentNames` is imported at runtime by `app/workspace/addressed-agent` and `app/admin/decisions`; `AddressedAgent`/`RuleCheck` by `verify-shield/decide`, `storage/decision-log`, `storage/conversation-store`, `storage/supabase-decision-log`.
 - Type-only importers of `turn.ts`: `course/course`, `course/course-spec`, `course/materials`, `agents/contexts`, `turn/handle-turn`, `app/pages/index.vue`, seven workspace components (`ConversationPanel`, `CourseRoadmap`, `MaterialBlocks`, `PracticePanel`, `QuizPanel`, `MindmapCanvas`, `WorkingArea`), `app/python/protocol`, `app/mindmap/arrangement`. The browser files reach it through the Nuxt alias `#shared/turn`, `app/python/protocol` by relative path.
 - Runtime importers of `materials.ts`: `agents/prompts.ts` (`materialsText`) and `MaterialVideo.vue` (`videoEmbed`). `materials.test.ts` tests `videoEmbed` and `diagramTheme`.
-- Runtime importers of `injection-suite.ts`: `server/cyber-security/injection-suite.ts` (`injectionCategoryIds`, `injectionCategoryLabels`), `app/pages/admin/security.vue` (`securitySummary`, through `#shared/injection-suite`), and both cyber-security tests (`injectionCategoryIds`, and `securitySummary` in `cyber-security-run.test.ts`). Type-only importers: `server/cyber-security/handle-suite.ts`, `handle-run.ts`, `handle-records.ts` and `run-suite.ts`, `server/storage/cyber-test-record-store.ts`, `supabase-cyber-test-record-store.ts`, `api/admin/security-run.post.ts`, the three `api/admin/security-records*` routes (through the component), `cyber-security-records.test.ts`, and `security.vue` (the view, run event and record types). `index.ts` re-exports from `injection-suite.ts` and does not import `shared`; `fixture.ts` uses no shared type.
+- Runtime importers of `injection-suite.ts`: `server/cyber-security/injection-suite.ts` (`injectionCategoryIds`, `injectionCategoryLabels`), `server/cyber-security/handle-records.ts` (`securitySummary`), `app/pages/admin/security.vue` (`securitySummary`, through `#shared/injection-suite`), `app/components/admin/CyberCaseRow.vue` (`injectionCategoryLabels`), and both cyber-security tests (`injectionCategoryIds`, and `securitySummary` in `cyber-security-run.test.ts`). Type-only importers: `server/cyber-security/handle-suite.ts`, `handle-run.ts`, `handle-records.ts` and `run-suite.ts`, `server/storage/cyber-test-record-store.ts`, `supabase-cyber-test-record-store.ts`, `api/admin/security-run.post.ts`, the three `api/admin/security-records*` routes (through the component), `cyber-security-records.test.ts`, `security.vue` (the view, run event and record types), and `CyberCaseRow.vue` (`InjectionAgent`, `InjectionCaseEvent`). `index.ts` re-exports from `injection-suite.ts` and does not import `shared`; `fixture.ts` uses no shared type.
 - No test imports `student-id.ts` or `supabase-server.ts`. `mindmap-arrangement.test.ts` imports `turn.ts`.
 
 ## Notes
