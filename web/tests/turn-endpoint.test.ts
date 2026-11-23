@@ -2747,8 +2747,8 @@ describe('turn endpoint', () => {
       body,
     }, memoryStore(), undefined, { quizAnswers, activity })
 
-    expect(first.courseRoadmap[0]?.mastery).toBe(0.39)
-    expect(second.courseRoadmap[0]?.mastery).toBe(0.39)
+    expect(first.courseRoadmap[0]?.mastery).toBe(0.32)
+    expect(second.courseRoadmap[0]?.mastery).toBe(0.32)
     expect(activity.events).toEqual([{
       studentId: signedInStudent,
       courseId: 'intro_python',

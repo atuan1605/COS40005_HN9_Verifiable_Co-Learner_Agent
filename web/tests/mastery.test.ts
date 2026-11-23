@@ -7,7 +7,7 @@ const masteryParameters = masteryParametersFor(pythonCourse.masteryThreshold)
 const moduleIds = courseModules.map(module => module.id)
 
 describe('mastery estimator', () => {
-  it('uses per-kind slip and guess when replaying interleaved observations', () => {
+  it('uses per-kind slip, guess and learning when replaying interleaved observations', () => {
     const ledger: Observation[] = [
       { kind: 'submission', moduleId: 'getting_started', exerciseId: 'say_hello', allPassed: true },
       { kind: 'quiz_answer', moduleId: 'getting_started', questionId: 'print-text', allPassed: false },
@@ -15,7 +15,7 @@ describe('mastery estimator', () => {
       { kind: 'quiz_answer', moduleId: 'getting_started', questionId: 'comment-line', allPassed: true },
     ]
     const estimated = estimateMastery(ledger, moduleIds, masteryParameters)
-    expect(masteryOf(estimated, 'getting_started')).toBeCloseTo(0.588801, 6)
+    expect(masteryOf(estimated, 'getting_started')).toBeCloseTo(0.397151, 6)
     expect(estimated[0]?.passedExercise).toBe(true)
   })
 
@@ -39,6 +39,14 @@ describe('mastery estimator', () => {
 
     expect(masteryOf(estimated, 'getting_started')).toBeCloseTo(0.433333, 6)
     expect(masteryOf(estimated, 'variables')).toBe(0.1)
+  })
+
+  it('raises mastery less for one correct quiz answer than for one passed exercise', () => {
+    const quiz = estimateMastery(quizPasses(1), moduleIds, masteryParameters)
+    const exercise = estimateMastery(passes(1), moduleIds, masteryParameters)
+
+    expect(masteryOf(quiz, 'getting_started')).toBeCloseTo(0.321429, 6)
+    expect(masteryOf(exercise, 'getting_started')).toBeGreaterThan(masteryOf(quiz, 'getting_started'))
   })
 
   it('ignores a pass of an exercise the student has already passed', () => {
@@ -106,7 +114,7 @@ describe('mastery estimator', () => {
   })
 
   it('does not master a module that reaches the threshold with no passed exercise', () => {
-    const quizOnly = estimateMastery(quizPasses(3), moduleIds, masteryParameters)
+    const quizOnly = estimateMastery(quizPasses(4), moduleIds, masteryParameters)
     const module = quizOnly.find(item => item.moduleId === 'getting_started')
 
     expect(masteryOf(quizOnly, 'getting_started')).toBeGreaterThanOrEqual(masteryParameters.threshold)
@@ -134,7 +142,7 @@ describe('mastery estimator', () => {
       masteryParameters,
     )
 
-    expect(masteryOf(failed, 'getting_started')).toBeCloseTo(0.787809, 6)
+    expect(masteryOf(failed, 'getting_started')).toBeCloseTo(0.762845, 6)
     expect(masteryOf(failed, 'getting_started')).toBeLessThan(masteryOf(mastered, 'getting_started'))
   })
 

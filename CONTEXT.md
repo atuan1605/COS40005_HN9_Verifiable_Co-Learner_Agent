@@ -205,7 +205,7 @@ The student's record over time: exercises completed and attempts needed to pass 
 _Avoid_: resume point, mastery
 
 **Mastery**:
-The system's estimate, between 0 and 1, of how well a student knows a module, computed from evidence alone, from both submissions and quiz answers; a module counts as mastered once its mastery reaches the threshold and the student has passed at least one of its exercises, so quiz answers alone never master a module.
+The system's estimate, between 0 and 1, of how well a student knows a module, computed from evidence alone, from both submissions and quiz answers, where a passed exercise moves it more than a correct quiz answer; a module counts as mastered once its mastery reaches the threshold and the student has passed at least one of its exercises, so quiz answers alone never master a module.
 _Avoid_: progress, score, level, SM
 
 **Progress panel**:

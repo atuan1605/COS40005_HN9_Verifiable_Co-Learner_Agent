@@ -4,8 +4,8 @@ import { estimateCourse, standingFor, type Observation } from '../server/student
 
 const moduleId = 'getting_started'
 
-// Three correct answers that are not exercise submissions: they raise the first
-// module to the threshold, but pass no exercise.
+// Three correct answers that are not exercise submissions: they raise the first module to 0.876,
+// the threshold of a course set at 0.85, but pass no exercise.
 const quizPasses: Observation[] = ['print-text', 'comment-line', 'program-steps'].map(questionId => ({
   moduleId,
   kind: 'quiz_answer', questionId,
@@ -16,14 +16,14 @@ const quizPasses: Observation[] = ['print-text', 'comment-line', 'program-steps'
 const exercisePasses: Observation[] = ['say_hello', 'join_words', 'sign_the_program']
   .map(exerciseId => ({ moduleId, kind: 'submission', exerciseId, allPassed: true }))
 
-function roadmapFor(evidence: readonly Observation[]) {
-  const standing = standingFor(estimateCourse(pythonCourse, evidence), moduleId)
-  return presentedRoadmap(pythonCourse, standing)
+function roadmapFor(evidence: readonly Observation[], course = pythonCourse) {
+  const standing = standingFor(estimateCourse(course, evidence), moduleId)
+  return presentedRoadmap(course, standing)
 }
 
 describe('presented roadmap', () => {
   it('shows a module at the threshold with no passed exercise as open with a reason', () => {
-    const module = roadmapFor(quizPasses).find(item => item.id === moduleId)
+    const module = roadmapFor(quizPasses, { ...pythonCourse, masteryThreshold: 0.85 }).find(item => item.id === moduleId)
 
     expect(module?.state).toBe('open')
     expect(module && 'masteryReason' in module ? module.masteryReason : undefined)
