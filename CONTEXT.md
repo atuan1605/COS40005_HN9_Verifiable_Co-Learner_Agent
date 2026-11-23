@@ -38,7 +38,7 @@ The person who reviews what the VerifyShield decided, switches it on or off, and
 _Avoid_: product owner, admin, assessor
 
 **Lecturer**:
-The person who owns a course: edits or imports its course spec, sets its mastery threshold, and sees who is enrolled by name, student number and email. May open the records of a student enrolled in a course they own (see **Staff review**). Never sees a student's mastery. Has no say over the VerifyShield or the language model. One person may be both a lecturer and an administrator.
+The person who owns a course: edits or imports its course spec, sets its mastery threshold, and sees who is enrolled by name, student number and email. May open the records of a student enrolled in a course they own (see **Staff review**), and sees each such student's **Course progress** and per-module **Mastery**, the same stored figure the student sees (ADR 0013). The administrator never sees mastery. Has no say over the VerifyShield or the language model. One person may be both a lecturer and an administrator.
 _Avoid_: teacher, instructor, admin, product owner
 
 ### Course

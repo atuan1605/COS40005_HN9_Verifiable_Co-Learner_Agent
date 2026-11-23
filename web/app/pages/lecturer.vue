@@ -275,6 +275,9 @@ function enrolledText(value: string): string {
                       Student number<span v-if="sortOf(course.id).key === 'studentNumber'" aria-hidden="true">{{ sortOf(course.id).asc ? '↑' : '↓' }}</span>
                     </button>
                   </th>
+                  <th scope="col" class="px-3 py-2 font-medium">
+                    Progress
+                  </th>
                   <th scope="col" class="hidden px-3 py-2 font-medium md:table-cell">
                     Email
                   </th>
@@ -312,6 +315,21 @@ function enrolledText(value: string): string {
                     <p class="text-xs text-muted whitespace-nowrap md:hidden">
                       Enrolled {{ enrolledText(student.enrolledAt) }}
                     </p>
+                  </td>
+                  <td class="px-3 py-3" data-testid="student-progress">
+                    <p class="font-mono text-xs whitespace-nowrap text-ink-700">
+                      {{ student.progress.mastered }}/{{ student.progress.total }} · {{ student.progress.percent }}%
+                    </p>
+                    <div
+                      class="mt-1 h-1.5 w-16 overflow-hidden rounded-full bg-ink-100"
+                      role="progressbar"
+                      :aria-label="`${student.displayName}'s course progress`"
+                      :aria-valuenow="student.progress.percent"
+                      aria-valuemin="0"
+                      aria-valuemax="100"
+                    >
+                      <div class="h-full rounded-full bg-brand-500" :style="{ width: `${student.progress.percent}%` }" />
+                    </div>
                   </td>
                   <td class="hidden px-3 py-3 [overflow-wrap:anywhere] md:table-cell">
                     {{ student.email }}

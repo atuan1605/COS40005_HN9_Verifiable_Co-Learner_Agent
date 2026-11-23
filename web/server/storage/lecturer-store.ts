@@ -1,8 +1,24 @@
-import type { LecturerCourse } from '../../shared/lecturer'
+import type { LecturerCourse, LecturerStudent } from '../../shared/lecturer'
 import type { CourseSpec } from '../course'
+import type { StoredMastery } from '../student-model'
+
+// What the store reads for an owned course: the enrolled students with their stored mastery rows
+// and the course's modules, so the handler can derive each student's Course progress (ADR 0013).
+export interface LecturerCourseRecord extends Omit<LecturerCourse, 'students'> {
+  modules: { id: string, available: boolean }[]
+  students: (Omit<LecturerStudent, 'progress'> & { masteries: StoredMastery[] })[]
+}
+
+type SeededCourse = Omit<LecturerCourse, 'students'> & {
+  ownerEmail: string
+  spec?: CourseSpec
+  draft?: CourseSpec | null
+  modules?: { id: string, available: boolean }[]
+  students: (Omit<LecturerStudent, 'progress'> & { masteries?: StoredMastery[] })[]
+}
 
 export interface LecturerStore {
-  forLecturer: (email: string) => Promise<LecturerCourse[]>
+  forLecturer: (email: string) => Promise<LecturerCourseRecord[]>
   setThreshold: (email: string, courseId: string, threshold: number) => Promise<boolean>
   exportSpec: (email: string, courseId: string) => Promise<CourseSpec | null>
   importSpec: (email: string, spec: CourseSpec) => Promise<boolean>
@@ -12,12 +28,13 @@ export interface LecturerStore {
 }
 
 export function createMemoryLecturerStore(
-  courses: readonly (LecturerCourse & { ownerEmail: string, spec?: CourseSpec, draft?: CourseSpec | null })[],
+  courses: readonly SeededCourse[],
 ): LecturerStore {
   const stored = courses.map(course => ({
     ...course,
     history: [...course.history],
-    students: course.students.map(student => ({ ...student })),
+    modules: (course.modules ?? []).map(module => ({ ...module })),
+    students: course.students.map(student => ({ ...student, masteries: (student.masteries ?? []).map(row => ({ ...row })) })),
     draft: course.draft ? structuredClone(course.draft) : null,
   }))
   function owned(email: string, courseId: string) {
@@ -55,13 +72,14 @@ export function createMemoryLecturerStore(
     },
     async forLecturer(email) {
       return stored.filter(course => course.ownerEmail === email)
-        .map(({ id, title, enrolledCount, masteryThreshold, history, students }) => ({
+        .map(({ id, title, enrolledCount, masteryThreshold, history, modules, students }) => ({
           id,
           title,
           enrolledCount,
           masteryThreshold,
           history: history.map(entry => ({ ...entry })),
-          students: students.map(student => ({ ...student })),
+          modules: modules.map(module => ({ ...module })),
+          students: students.map(student => ({ ...student, masteries: student.masteries.map(row => ({ ...row })) })),
         }))
     },
     async setThreshold(email, courseId, threshold) {

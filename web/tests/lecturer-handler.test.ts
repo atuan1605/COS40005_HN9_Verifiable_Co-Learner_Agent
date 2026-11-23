@@ -47,7 +47,14 @@ describe('lecturer handler', () => {
     ])
 
     await expect(handleLecturer({ email: 'Lecturer@example.com', lecturerEmails, store })).resolves.toEqual({
-      courses: [{ id: 'intro_python', title, enrolledCount: 2, masteryThreshold: 0.9, history: [seeded], students }],
+      courses: [{
+        id: 'intro_python',
+        title,
+        enrolledCount: 2,
+        masteryThreshold: 0.9,
+        history: [seeded],
+        students: students.map(student => ({ ...student, progress: { mastered: 0, total: 0, percent: 0 } })),
+      }],
     })
   })
 
@@ -68,6 +75,42 @@ describe('lecturer handler', () => {
 
     expect((await handleLecturer({ ...request, campus: '' })).courses[0]!.students).toHaveLength(2)
     await expect(handleLecturer({ ...request, campus: 'Mars' })).rejects.toMatchObject({ statusCode: 400 })
+  })
+
+  it('shows each enrolled student\'s Course progress for an owned course, from stored mastery', async () => {
+    const row = (moduleId: string, mastery: number, passedExercise: boolean) => ({ moduleId, mastery, passedExercise, everMastered: mastery >= 0.9 })
+    const store = createMemoryLecturerStore([
+      {
+        ...python,
+        // Three modules have content; the fourth is listed without content and never counts.
+        modules: [{ id: 'm1', available: true }, { id: 'm2', available: true }, { id: 'm3', available: true }, { id: 'm4', available: false }],
+        students: [
+          // Two mastered; m3 is at the threshold but has no passed exercise, so it is not mastered.
+          { ...students[0]!, masteries: [row('m1', 0.95, true), row('m2', 0.91, true), row('m3', 0.92, false)] },
+          { ...students[1]!, masteries: [row('m1', 0.4, true)] },
+        ],
+      },
+      {
+        ownerEmail: 'other@example.com',
+        id: 'other',
+        title: 'Other course',
+        enrolledCount: 1,
+        masteryThreshold: 0.9,
+        history: [],
+        modules: [{ id: 'm1', available: true }],
+        students: [{ displayName: 'Elsewhere', studentNumber: 'SWB0009', campus: null, email: 'else@example.com', enrolledAt: '2026-11-14T09:00:00Z', masteries: [row('m1', 0.99, true)] }],
+      },
+    ])
+
+    const response = await handleLecturer({ email: 'lecturer@example.com', lecturerEmails, store })
+
+    expect(response.courses.map(course => course.id)).toEqual(['intro_python'])
+    expect(response.courses[0]!.students.map(student => [student.email, student.progress])).toEqual([
+      ['an@example.com', { mastered: 2, total: 3, percent: 66 }],
+      ['binh@example.com', { mastered: 0, total: 3, percent: 0 }],
+    ])
+    expect(JSON.stringify(response)).not.toContain('masteries')
+    expect(JSON.stringify(response)).not.toContain('else@example.com')
   })
 
   it.each([0.49, 1, NaN, '0.8'])('rejects invalid threshold %s before writing', async (threshold) => {
