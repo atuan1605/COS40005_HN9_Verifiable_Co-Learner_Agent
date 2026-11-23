@@ -25,7 +25,7 @@ test('keeps the desktop IDE unchanged at 1440 × 900', async ({ page }) => {
   await expect(page.locator('header').getByText('Student', { exact: true })).toBeVisible()
   await expect(page.locator('header span:not([aria-hidden="true"])').filter({ hasText: /^An$/ })).toBeVisible()
   await expect(page.getByText('These materials belong to this module alone.', { exact: true })).toBeVisible()
-  await expect(page.getByText('Teacher + Deskmate', { exact: true })).toBeVisible()
+  await expect(page.getByText('Teacher + Deskmate', { exact: true })).toHaveCount(0)
   await expectNoDocumentScroll(page)
 
   const header = page.locator('main > header')
@@ -127,7 +127,6 @@ test('uses one full-height panel on a phone and reaches every control', async ({
 
     await page.getByRole('tab', { name: 'Conversation', exact: true }).click()
     await expectOnlyPanel(page, 'conversation')
-    await expect(page.getByText('Teacher + Deskmate', { exact: true })).toBeHidden()
     await expect(conversation(page).getByRole('heading', { name: 'Conversation', exact: true })).toBeVisible()
     const composer = page.getByRole('textbox', { name: 'Message' })
     const send = page.getByRole('button', { name: 'Send', exact: true })
