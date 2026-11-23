@@ -58,12 +58,16 @@ export async function saveMasteryFromEvidence(
   studentId: string,
   store: MasteryStore,
 ): Promise<StoredMastery[]> {
-  const estimates = estimateMastery(
+  return store.save(studentId, masteryFromEvidence(course, evidence))
+}
+
+// The rows the estimate gives over the ledger, before anything stores them.
+export function masteryFromEvidence(course: StudiedCourse, evidence: readonly Observation[]): StoredMastery[] {
+  return estimateMastery(
     evidenceTheCourseHas(course, evidence),
     course.modules.map(module => module.id),
     masteryParametersFor(course.masteryThreshold),
   )
-  return store.save(studentId, estimates)
 }
 
 // The stored rows for this student, rebuilt from evidence and saved first when a module of the

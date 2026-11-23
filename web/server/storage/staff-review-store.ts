@@ -27,6 +27,8 @@ export interface StaffReviewStore {
   learningPlans: (studentId: string, courseId: string) => Promise<LearningPlan[]>
   // The student's stored mastery rows in the course (ADR 0008). Read only for the owning lecturer (ADR 0013).
   masteries: (studentId: string, courseId: string) => Promise<StoredMastery[]>
+  // The modules recorded as unlocked for the student in the course (ADR 0005), read with mastery.
+  unlocks: (studentId: string, courseId: string) => Promise<string[]>
 }
 
 export interface MemoryStaffReviewData {
@@ -38,6 +40,7 @@ export interface MemoryStaffReviewData {
   learningPlans?: Readonly<Record<string, readonly LearningPlan[]>>
   conversations?: Readonly<Record<string, readonly ReviewConversation[]>>
   masteries?: Readonly<Record<string, readonly StoredMastery[]>>
+  unlocks?: Readonly<Record<string, readonly string[]>>
 }
 
 export function createMemoryStaffReviewStore(data: MemoryStaffReviewData): StaffReviewStore {
@@ -61,6 +64,9 @@ export function createMemoryStaffReviewStore(data: MemoryStaffReviewData): Staff
     },
     async masteries(studentId) {
       return (data.masteries?.[studentId] ?? []).map(row => ({ ...row }))
+    },
+    async unlocks(studentId) {
+      return [...(data.unlocks?.[studentId] ?? [])]
     },
     async conversations(studentId) {
       return (data.conversations?.[studentId] ?? []).map(conversation => ({

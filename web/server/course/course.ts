@@ -1,5 +1,5 @@
 import type { ModuleState, RoadmapModule as StudentRoadmapModule } from '../../shared/turn'
-import type { CourseStanding } from '../student-model'
+import { moduleState, type CourseStanding } from '../student-model'
 import type { CourseScope } from '../verify-shield'
 import { defaultFailureLimit } from '../learning-plan'
 import type { CourseSpec } from './course-spec'
@@ -144,12 +144,11 @@ const passExerciseReason = 'Pass an exercise to master this module.'
 
 function placeOnRoadmap(course: Course, module: CourseModule, standing: CourseStanding): RoadmapPlace {
   const mastery = standing.masteries.find(item => item.moduleId === module.id)?.mastery ?? 0
-  const unlocked = standing.unlockedModuleIds.includes(module.id)
   const passedExercise = standing.passedExerciseModuleIds.includes(module.id)
   const atThreshold = mastery >= course.masteryThreshold
   // A module is only mastered with a passed exercise; at the threshold without
-  // one it stays open and says so.
-  const state = !unlocked ? 'closed' : atThreshold && passedExercise ? 'mastered' : 'open'
+  // one it stays open and says so. The lecturer's screens read the same rule.
+  const state = moduleState(course, module.id, standing)
   const current = module.id === standing.currentModuleId
   if (state === 'open' && atThreshold && !passedExercise) {
     return { state, mastery, current, masteryReason: passExerciseReason }

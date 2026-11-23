@@ -2,9 +2,9 @@
 import type { StudySuggestionView } from '#shared/turn'
 
 // The one next step the rules chose from the student's activity, as a toast that leaves the
-// workspace usable. Closing it (X, Escape or the 10-second timer) and following it all dismiss
+// workspace usable. Closing it (X, Escape from inside it, or the 10-second timer) and following it all dismiss
 // this episode; only following it moves the student, and it never submits code. It never
-// takes focus. The page remounts it for each new suggestion, so the timer starts again.
+// takes focus. On phones it sits at the top so the composer stays clear. The page remounts it for each new suggestion, so the timer starts again.
 const props = defineProps<{
   suggestion: StudySuggestionView
   busy: boolean
@@ -19,6 +19,7 @@ const focused = ref(false)
 let remainingMs = lifetimeMs
 let startedAt = 0
 let timer: ReturnType<typeof setTimeout> | undefined
+const panel = ref<HTMLElement | null>(null)
 
 // The timer runs only while nobody is reading the toast and no dismissal failed.
 const running = computed(() => !hovered.value && !focused.value && !props.busy && !props.error)
@@ -44,22 +45,34 @@ watch(() => props.error, (error) => {
   if (error) remainingMs = lifetimeMs
 })
 
+// Clicking a button disables it while the dismissal is sent, which drops focus without a focusout
+// that names a new target, so the hold is read again once the request settles.
+watch(() => props.busy, (busy) => {
+  if (!busy) focused.value = panel.value?.contains(document.activeElement) ?? false
+})
+
+// Escape closes only from inside the toast, so it never steals Escape from the editor or a dialog.
 function onKeydown(event: KeyboardEvent) {
   if (event.key !== 'Escape' || event.defaultPrevented || props.busy) return
   emit('close')
 }
 
+// Only a mouse hovers; a touch's pointerenter must not hold the timer forever.
+function onPointerEnter(event: PointerEvent) {
+  if (event.pointerType === 'mouse') hovered.value = true
+}
+
+function onPointerLeave(event: PointerEvent) {
+  if (event.pointerType === 'mouse') hovered.value = false
+}
+
 onMounted(() => {
   if (running.value) start()
-  window.addEventListener('keydown', onKeydown)
 })
 
 onBeforeUnmount(() => {
   clearTimeout(timer)
-  window.removeEventListener('keydown', onKeydown)
 })
-
-const panel = ref<HTMLElement | null>(null)
 
 function onFocusOut(event: FocusEvent) {
   focused.value = panel.value?.contains(event.relatedTarget as Node | null) ?? false
@@ -72,9 +85,10 @@ function onFocusOut(event: FocusEvent) {
     aria-live="polite"
     aria-labelledby="study-suggestion-title"
     data-study-suggestion
-    class="phone-safe fixed inset-x-0 bottom-0 z-40 flex flex-col gap-3 border-t border-ink-200 bg-paper p-4 shadow-md md:inset-x-auto md:right-4 md:bottom-4 md:w-96 md:rounded-xl md:border"
-    @mouseenter="hovered = true"
-    @mouseleave="hovered = false"
+    class="phone-safe fixed inset-x-0 top-0 z-40 flex flex-col gap-3 border-b border-ink-200 bg-paper p-4 shadow-md md:inset-x-auto md:top-auto md:right-4 md:bottom-4 md:border-t md:w-96 md:rounded-xl md:border"
+    @pointerenter="onPointerEnter"
+    @pointerleave="onPointerLeave"
+    @keydown="onKeydown"
     @focusin="focused = true"
     @focusout="onFocusOut"
   >

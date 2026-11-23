@@ -1,7 +1,9 @@
 // One-off: recomputes every enrolled student's stored mastery in every course with the existing
 // course-wide recalculator (ADR 0008). Run once when the mastery parameters change, such as the
 // per-kind learning rates of #308. Unlocks are a union with the recorded ones, so no module closes
-// (ADR 0005). Running it twice gives the same rows: the estimate is a pure function of evidence.
+// (ADR 0005). Stored mastery itself may fall under the new weights and a mastered module may read
+// open again; that demotion is accepted (see docs/c4/03-components/server/05-student-model.md).
+// Running it twice gives the same rows: the estimate is a pure function of evidence.
 //
 // Run locally against the deployed database, after the new build is live:
 //   NUXT_PUBLIC_SUPABASE_URL=… NUXT_SUPABASE_SECRET_KEY=… pnpm dlx tsx scripts/recalculate-mastery.ts
