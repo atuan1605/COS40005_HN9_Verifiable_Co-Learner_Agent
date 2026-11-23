@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import BusySpinner from '../BusySpinner.vue'
 import type { ProgressView, RoadmapModule } from '#shared/turn'
+import { courseProgress } from '#shared/course-progress'
 import ProgressPanel from './ProgressPanel.vue'
 
 const props = defineProps<{
@@ -23,7 +24,8 @@ function onHover(event: PointerEvent, module: RoadmapModule) {
   emit('prefetchModule', module.id)
 }
 
-const masteredCount = computed(() => props.modules.filter(module => module.state === 'mastered').length)
+// Modules listed without content stay out of the total, so 100% is reachable.
+const progressSummary = computed(() => courseProgress(props.modules))
 const thresholdPercent = computed(() => Math.round(props.masteryThreshold * 100))
 
 // A closed module shows no mastery, so only an unlocked one reaches the bar.
@@ -64,13 +66,31 @@ function cardClass(module: RoadmapModule): string {
 <template>
   <aside class="h-full min-h-0 min-w-0 flex-col border-r border-ink-200 bg-ink-50/80 md:max-lg:block md:max-lg:h-auto md:max-lg:overflow-x-auto md:max-lg:overflow-y-hidden md:max-lg:border-r-0 md:max-lg:border-b lg:flex">
     <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:max-lg:w-max md:max-lg:min-w-full md:max-lg:flex-none md:max-lg:flex-row md:max-lg:items-center md:max-lg:overflow-visible lg:gap-3 lg:px-3 lg:pt-0">
-      <div class="flex items-center justify-between gap-2 md:max-lg:w-36 md:max-lg:shrink-0 md:max-lg:flex-col md:max-lg:items-start lg:sticky lg:top-0 lg:z-10 lg:-mx-3 lg:h-14 lg:shrink-0 lg:flex-col lg:items-start lg:justify-center lg:gap-0.5 lg:border-b lg:border-ink-200 lg:bg-paper lg:px-6">
+      <div class="flex items-center justify-between gap-2 md:max-lg:w-36 md:max-lg:shrink-0 md:max-lg:flex-col md:max-lg:items-start lg:sticky lg:top-0 lg:z-10 lg:-mx-3 lg:h-[4.5rem] lg:shrink-0 lg:flex-col lg:items-start lg:justify-center lg:gap-0.5 lg:border-b lg:border-ink-200 lg:bg-paper lg:px-6">
         <h2 class="text-xs leading-4 font-semibold tracking-[-0.2px] text-ink-800">
           Course roadmap
         </h2>
-        <p class="shrink-0 font-mono text-[10px] leading-[15px] text-ink-400">
-          {{ masteredCount }}/{{ modules.length }} modules mastered
-        </p>
+        <div class="flex min-w-0 shrink-0 flex-col gap-1 md:max-lg:w-full lg:w-full">
+          <p class="font-mono text-[10px] leading-[15px] text-ink-400">
+            {{ progressSummary.mastered }}/{{ progressSummary.total }} modules mastered
+          </p>
+          <div class="flex items-center gap-2">
+            <div
+              class="h-1.5 min-w-12 flex-1 overflow-hidden rounded-full bg-ink-100"
+              role="progressbar"
+              aria-label="Course progress"
+              :aria-valuenow="progressSummary.percent"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            >
+              <div
+                class="h-full rounded-full bg-brand-500 transition-[width]"
+                :style="{ width: `${progressSummary.percent}%` }"
+              />
+            </div>
+            <span class="font-mono text-[10px] leading-[15px] text-ink-500">{{ progressSummary.percent }}%</span>
+          </div>
+        </div>
       </div>
       <ul class="flex flex-col gap-1.5 md:max-lg:flex-row md:max-lg:flex-nowrap">
         <template

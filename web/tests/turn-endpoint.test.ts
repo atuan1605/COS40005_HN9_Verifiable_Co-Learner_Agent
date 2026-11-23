@@ -127,6 +127,7 @@ describe('turn endpoint', () => {
         summary: 'What programming is, algorithms as steps, and a first program with print() and comments',
         state: 'open',
         current: true,
+        available: true,
         mastery: 0.1,
       },
       {
@@ -136,6 +137,7 @@ describe('turn endpoint', () => {
         summary: 'Variables, data types, operators, input(), and type casting',
         state: 'closed',
         current: false,
+        available: true,
         closedReason: 'Needs Module 1: Getting Started with Programming and Python mastered',
       },
       {
@@ -145,6 +147,7 @@ describe('turn endpoint', () => {
         summary: 'Indexing, slicing, string methods, and f-strings',
         state: 'closed',
         current: false,
+        available: true,
         closedReason: 'Needs Module 2: Variables, Data Types, and Operators mastered',
       },
       {
@@ -154,6 +157,7 @@ describe('turn endpoint', () => {
         summary: 'if, elif, else, nested conditions, and logical operators',
         state: 'closed',
         current: false,
+        available: true,
         closedReason: 'Needs Module 3: Working with Strings mastered',
       },
       {
@@ -163,6 +167,7 @@ describe('turn endpoint', () => {
         summary: 'for, range(), while, break, continue, and nested loops',
         state: 'closed',
         current: false,
+        available: true,
         closedReason: 'Needs Module 4: Conditional Statements mastered',
       },
       {
@@ -172,6 +177,7 @@ describe('turn endpoint', () => {
         summary: 'Creating, changing, and looping over lists and tuples',
         state: 'closed',
         current: false,
+        available: false,
         closedReason: 'Not available yet',
       },
       {
@@ -181,6 +187,7 @@ describe('turn endpoint', () => {
         summary: 'Dictionaries, sets, and basic list comprehensions',
         state: 'closed',
         current: false,
+        available: false,
         closedReason: 'Not available yet',
       },
       {
@@ -190,6 +197,7 @@ describe('turn endpoint', () => {
         summary: 'Defining functions, parameters, return values, and scope',
         state: 'closed',
         current: false,
+        available: false,
         closedReason: 'Not available yet',
       },
       {
@@ -199,6 +207,7 @@ describe('turn endpoint', () => {
         summary: 'import, the standard library, pip, and virtual environments',
         state: 'closed',
         current: false,
+        available: false,
         closedReason: 'Not available yet',
       },
       {
@@ -208,6 +217,7 @@ describe('turn endpoint', () => {
         summary: 'Reading and writing text, CSV, and JSON files',
         state: 'closed',
         current: false,
+        available: false,
         closedReason: 'Not available yet',
       },
       {
@@ -217,6 +227,7 @@ describe('turn endpoint', () => {
         summary: 'Errors, try / except / finally, tracebacks, and simple tests',
         state: 'closed',
         current: false,
+        available: false,
         closedReason: 'Not available yet',
       },
     ])

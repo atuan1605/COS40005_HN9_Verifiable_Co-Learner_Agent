@@ -5,7 +5,7 @@ import MindmapNotes, { type NoteDraft } from '~/components/workspace/MindmapNote
 import { shrinkImage } from '~/utils/shrink-image'
 import MindmapCanvas from '~/components/workspace/MindmapCanvas.vue'
 import WorkingArea from '~/components/workspace/WorkingArea.vue'
-import StudySuggestionDialog from '~/components/workspace/StudySuggestionDialog.vue'
+import StudySuggestionToast from '~/components/workspace/StudySuggestionToast.vue'
 import CampusStep from '~/components/workspace/CampusStep.vue'
 import type { Campus } from '#shared/campus'
 import type { AddressedAgent, StudySuggestionView, PracticeTestResult, Quote, RedrawState, RunOutput, TurnEvent, TurnTrace } from '#shared/turn'
@@ -1333,8 +1333,9 @@ function initialsOf(name: string): string {
         Notes
       </UButton>
     </div>
-    <StudySuggestionDialog
+    <StudySuggestionToast
       v-if="workspace.studySuggestion && campus !== null"
+      :key="workspace.studySuggestion.key"
       :suggestion="workspace.studySuggestion"
       :busy="suggestionBusy"
       :error="suggestionError"

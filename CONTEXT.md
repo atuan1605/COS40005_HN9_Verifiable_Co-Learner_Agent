@@ -108,8 +108,12 @@ The three hints of a module, from gentlest (1) to most direct (3). The teacher a
 _Avoid_: hint list, hint level
 
 **Course roadmap**:
-The picture of the course that shows every module, grouped into parts, as mastered, open, or closed, with the student's mastery beside it and the reason a closed module is closed. A module that its course spec lists without content stays closed as not available.
+The picture of the course that shows every module, grouped into parts, as mastered, open, or closed, with the student's mastery beside it and the reason a closed module is closed. A module that its course spec lists without content stays closed as not available. Its header shows the student's **Course progress** as "x/total modules mastered" with a bar and the percentage.
 _Avoid_: knowledge map, skill tree, course map, progress map
+
+**Course progress**:
+How far a student is through a course: the mastered modules out of the modules that have content, as a count and a whole percentage rounded down. Modules listed without content are left out, so 100% is reachable. It is derived from stored **Mastery** and never stored, and the student's roadmap and the lecturer's screens use the same derivation.
+_Avoid_: completion, course completion, overall mastery
 
 **Unlocked module**:
 A module that is open or mastered. Module 1 is unlocked from the start; each later module unlocks when the one before it is mastered, and stays unlocked even if mastery later falls or the lecturer raises the mastery threshold.
@@ -225,7 +229,7 @@ Three minutes in Practice mode without activity. The Teacher checks in once on t
 _Avoid_: timeout, inactivity
 
 **Study suggestion**:
-The one next step a student is shown, drawn from how they have actually been studying: fixed rules read their activity log for the current course and choose at most one, among the modules they have unlocked and the work of the current module. They see it in a dialog that covers the workspace until they close it or follow it; following it only moves them somewhere they could already open, and never submits code for them. A closed step stays dismissed until it has ended and the rules choose it again, and a lower step does not take its place at the moment of dismissal. The rules, not a language model, choose it. The Teacher's prompt includes the current step and the VerifyShield stops it advising the opposite; the Deskmate never hears it. It is not a learning plan, and since the activity log is not evidence it changes no mastery, unlock or roadmap.
+The one next step a student is shown, drawn from how they have actually been studying: fixed rules read their activity log for the current course and choose at most one, among the modules they have unlocked and the work of the current module. They see it in a toast at the bottom of the workspace, which stays usable; it closes itself after ten seconds (paused while they point at or focus it), or when they close it or follow it, and each of these dismisses it; following it only moves them somewhere they could already open, and never submits code for them. A closed step stays dismissed until it has ended and the rules choose it again, and a lower step does not take its place at the moment of dismissal. The rules, not a language model, choose it. The Teacher's prompt includes the current step and the VerifyShield stops it advising the opposite; the Deskmate never hears it. It is not a learning plan, and since the activity log is not evidence it changes no mastery, unlock or roadmap.
 _Avoid_: nudge, alert, learning plan
 
 **Plan step**:

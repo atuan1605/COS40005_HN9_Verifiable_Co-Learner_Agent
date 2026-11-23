@@ -184,6 +184,7 @@ export function presentedRoadmap(course: Course, standing: CourseStanding): Stud
       part: module.part,
       summary: module.summary,
       current: placed.current,
+      available: module.available,
     }
     // A closed module shows the lock and the reason, and no mastery: a number
     // is only shown where it means something.
