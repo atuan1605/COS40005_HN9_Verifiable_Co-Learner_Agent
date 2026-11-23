@@ -1,4 +1,5 @@
-import type { ReviewEvent, ReviewPlan, StaffReview } from '../../shared/staff-review'
+import type { ReviewEvent, ReviewModuleMastery, ReviewPlan, StaffReview } from '../../shared/staff-review'
+import { storedCourseEstimate, type StoredMastery } from '../student-model'
 import type { StaffAccessLog, StaffAccessRole } from '../storage/staff-access-log'
 import type { StaffReviewStore } from '../storage/staff-review-store'
 import { defaultCourseId, type Course } from '../course'
@@ -68,6 +69,10 @@ export async function handleStaffReview(request: StaffReviewRequest): Promise<St
     gatherLearningPattern(request.patternSources(courseId), student.id, course),
   ])
   const signals = reviewSignals(events)
+  // Mastery is read for the owning lecturer only; the administrator never sees it (ADR 0013).
+  const mastery = actorRole === 'lecturer'
+    ? { mastery: reviewMastery(await request.store.masteries(student.id, courseId), course) }
+    : {}
   return {
     student: { displayName: student.displayName, studentNumber: student.studentNumber, campus: student.campus, email: student.email },
     courseId,
@@ -77,7 +82,24 @@ export async function handleStaffReview(request: StaffReviewRequest): Promise<St
     signals,
     plans: reviewPlans(plans, course),
     learningPattern,
+    ...mastery,
   }
+}
+
+// Each module of the course with its stored mastery and its roadmap state: mastered at the threshold
+// with a passed exercise, open once unlocked, closed otherwise. A module with no row reads 0.
+function reviewMastery(rows: readonly StoredMastery[], course: Course): ReviewModuleMastery[] {
+  const unlocked = new Set(storedCourseEstimate(course, rows).unlockedModuleIds)
+  return course.modules.map((module) => {
+    const row = rows.find(item => item.moduleId === module.id)
+    const mastered = row !== undefined && row.passedExercise && row.mastery >= course.masteryThreshold
+    return {
+      moduleId: module.id,
+      name: module.name,
+      mastery: row?.mastery ?? 0,
+      state: mastered ? 'mastered' : unlocked.has(module.id) ? 'open' : 'closed',
+    }
+  })
 }
 
 // The plans by module, every revision of each, oldest first, with each step in words.

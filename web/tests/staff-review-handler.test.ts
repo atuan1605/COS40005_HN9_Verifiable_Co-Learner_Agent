@@ -32,6 +32,12 @@ function setup() {
       { id: 'other_course', ownerEmail: 'other@example.com', enrolled: ['binh-id'] },
     ],
     activity: { 'an-id': events },
+    masteries: {
+      'an-id': [
+        { moduleId: 'getting_started', mastery: 0.97, passedExercise: true, everMastered: true },
+        { moduleId: 'variables', mastery: 0.4, passedExercise: false, everMastered: false },
+      ],
+    },
     learningPlans: { 'an-id': plans },
     submissions: {
       'an-id': [{
@@ -154,6 +160,33 @@ describe('staff review handler', () => {
 
     expect(second.signals).toEqual(first.signals)
     expect(await parts.store.activity('an-id', 'intro_python')).toEqual(events)
+  })
+})
+
+describe('the mastery a review shows', () => {
+  it('shows the owning lecturer the stored mastery and state of each module', async () => {
+    const review = await open('lecturer@example.com', 'SWB0001').result
+
+    expect(review.mastery?.slice(0, 3)).toEqual([
+      { moduleId: 'getting_started', name: expect.any(String), mastery: 0.97, state: 'mastered' },
+      { moduleId: 'variables', name: expect.any(String), mastery: 0.4, state: 'open' },
+      { moduleId: 'strings', name: expect.any(String), mastery: 0, state: 'closed' },
+    ])
+  })
+
+  it('still writes the staff access log when the lecturer reads mastery', async () => {
+    const { result, parts } = open('lecturer@example.com', 'SWB0001')
+    await result
+    expect(parts.accessLog.rows).toMatchObject([{ actorRole: 'lecturer', studentId: 'an-id', opened: 'student_review' }])
+  })
+
+  it('refuses another lecturer the mastery of a student outside their courses', async () => {
+    await expect(open('other@example.com', 'SWB0001').result).rejects.toMatchObject({ statusCode: 403 })
+  })
+
+  it('hands the administrator no mastery', async () => {
+    const review = await open('owner@example.com', 'SWB0001').result
+    expect(review).not.toHaveProperty('mastery')
   })
 })
 
