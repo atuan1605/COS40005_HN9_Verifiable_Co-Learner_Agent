@@ -89,10 +89,15 @@ routes, so nothing outside `storage` names a table.
 
 ## Verified imports
 
-- Imports: none outside its own files. It does not import `course`: `estimateCourse` and `furthestUnlockedModuleId` take the course as an argument, and read only its mastery threshold and each module's `id`, `available`, `exerciseIds` and `questionIds`. The estimator accepts observations tagged as `submission` or `quiz_answer`. Only a passing submission counts as a passed exercise.
-- Runtime importers, through `index.ts`: `turn/handle-turn.ts`, `storage/supabase-evidence-store.ts` (`mergeObservations`), `storage/supabase-mastery-recalculation.ts` (`createMasteryRecalculator`).
+- Imports: none outside its own files except the `ModuleState` type from `shared/turn`. It does not import `course`: `estimateCourse` and `furthestUnlockedModuleId` take the course as an argument, and read only its mastery threshold and each module's `id`, `available`, `exerciseIds` and `questionIds`. The estimator accepts observations tagged as `submission` or `quiz_answer`. Only a passing submission counts as a passed exercise.
+- Runtime importers, through `index.ts`: `turn/handle-turn.ts` (also `legacyUnlocksFor`), `course/course.ts` (`moduleState`), `lecturer/handle-lecturer.ts` and `staff-review/handle-staff-review.ts` (`moduleStandings`, `needsEvidence`), `storage/supabase-evidence-store.ts` (`mergeObservations`), `storage/supabase-mastery-recalculation.ts` (`createMasteryRecalculator`).
 - Type-only importers: `turn/handle-turn.ts` (`CourseEstimate`, `CourseStanding`, `EvidenceStore`, `MasteryStore`, `StoredMastery`), `course/course.ts` (`CourseStanding`), `lecturer/handle-lecturer.ts` (`MasteryRecalculator`), `storage/supabase-evidence-store.ts` (`EvidenceStore`, `EvidenceRow`, `TimedObservation`), `storage/supabase-mastery-store.ts` (`MasteryStore`, `StoredMastery`), `storage/quiz-answer-store.ts` (`TimedObservation`).
 - Tests: `mastery.test.ts` and `course-roadmap.test.ts` (both also import `course`); `stored-mastery.test.ts` (the store, the read that rebuilds a missing row and the recalculator); `turn-endpoint.test.ts` and `admin-handler.test.ts` reach it through `handle-turn.ts`.
+
+## Consequences
+
+- Changing the mastery parameters (the per-kind learning rates of #308, ADR 0013) and recomputing with `scripts/recalculate-mastery.ts` can lower a student's stored mastery and turn a mastered module back to open. That demotion is accepted: the number follows the evidence under the current parameters, while every recorded unlock stays (ADR 0005), so no module closes.
+- Module states have one rule, `moduleState` in `module-states.ts`: closed until unlocked, mastered at the threshold with a passed exercise, open otherwise. The roadmap (`course.ts` `placeOnRoadmap`), the lecturer's Course progress and the staff review's per-module mastery all read it, and `moduleStandings` gives the read-only screens the same unlocks as the turn (recorded unlocks plus `legacyUnlocksFor`) and rebuilds missing rows from evidence like `readStoredMastery`, without writing.
 
 ## Notes
 

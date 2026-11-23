@@ -91,6 +91,12 @@ export function createSupabaseStaffReviewStore({ url, secretKey }: { url: string
       if (result.error) throw new Error(result.error.message)
       return result.data.map(row => ({ moduleId: row.module_id, mastery: row.mastery, passedExercise: row.passed_exercise, everMastered: row.ever_mastered }))
     },
+    async unlocks(studentId, courseId) {
+      const result = await supabase.from('module_unlocks').select('module_id')
+        .eq('student_id', studentId).eq('course_id', courseId)
+      if (result.error) throw new Error(result.error.message)
+      return result.data.map(row => row.module_id)
+    },
     async conversations(studentId, courseId) {
       const conversations = await supabase.from('conversations').select('id, module_id')
         .eq('student_id', studentId).eq('course_id', courseId).order('module_id')

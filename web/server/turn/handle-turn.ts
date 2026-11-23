@@ -11,6 +11,7 @@ import {
   createMemoryEvidenceStore,
   estimateCourse,
   furthestUnlockedModuleId,
+  legacyUnlocksFor,
   readStoredMastery,
   saveMasteryFromEvidence,
   standingFor,
@@ -222,13 +223,7 @@ async function* turnBody(
   ])
   const unlocks = options?.unlocks
   let recordedUnlocks = await unlocks?.forStudent(studentId) ?? []
-  let legacyUnlocks: readonly string[] = []
-  if (course.legacyUnlocks) {
-    const { before, threshold } = course.legacyUnlocks
-    const legacyEvidence = rows.filter(row => Date.parse(row.time) < Date.parse(before))
-    const legacy = estimateCourse({ ...course, masteryThreshold: threshold }, legacyEvidence)
-    legacyUnlocks = legacy.unlockedModuleIds
-  }
+  const legacyUnlocks = legacyUnlocksFor(course, rows)
   const masteries = options?.mastery
   // The estimate this turn reads. New evidence is stored before it is read again, so the
   // roadmap the student gets back already counts what they just did; otherwise the stored

@@ -14,6 +14,7 @@ export { createMemoryUnlockStore } from './unlock-store'
 export type { UnlockStore } from './unlock-store'
 export {
   createMemoryMasteryStore,
+  masteryFromEvidence,
   readStoredMastery,
   saveMasteryFromEvidence,
   storedCourseEstimate,
@@ -21,3 +22,5 @@ export {
 export type { MasteryStore, StoredMastery } from './mastery-store'
 export { createMasteryRecalculator } from './mastery-recalculation'
 export type { MasteryRecalculator, MasteryRecalculationSources } from './mastery-recalculation'
+export { legacyUnlocksFor, moduleStandings, moduleState, needsEvidence } from './module-states'
+export type { ModuleStanding, UnlockingCourse } from './module-states'

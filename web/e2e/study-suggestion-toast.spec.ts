@@ -49,7 +49,7 @@ test('pauses the timer while the pointer is on the toast', async ({ page }) => {
   await expect(toast).toBeHidden({ timeout: 13_000 })
 })
 
-test('closes and dismisses with X and with Escape', async ({ page }) => {
+test('closes and dismisses with X and with Escape from inside the toast', async ({ page }) => {
   const dismissals = await openWithSuggestion(page)
   const toast = page.locator('[data-study-suggestion]')
   await toast.getByRole('button', { name: 'Close suggestion' }).click()
@@ -58,6 +58,11 @@ test('closes and dismisses with X and with Escape', async ({ page }) => {
 
   await page.reload()
   await expect(toast).toBeVisible({ timeout: 60_000 })
+  // Escape elsewhere in the workspace belongs to whatever has focus there.
+  await page.keyboard.press('Escape')
+  await expect(toast).toBeVisible()
+  expect(dismissals).toEqual(['e2e-step'])
+  await toast.getByRole('button', { name: 'Close suggestion' }).focus()
   await page.keyboard.press('Escape')
   await expect(toast).toBeHidden()
   expect(dismissals).toEqual(['e2e-step', 'e2e-step'])
