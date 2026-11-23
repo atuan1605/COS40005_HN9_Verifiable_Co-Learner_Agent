@@ -4,7 +4,14 @@ import BusySpinner from '~/components/BusySpinner.vue'
 import { messageFrom } from '~/admin/message'
 import type { AdminPayload } from '~/admin/decisions'
 import { injectionCategoryLabels, securitySummary } from '#shared/injection-suite'
-import type { InjectionAgent, InjectionCaseEvent, InjectionRunEvent, InjectionRunProvider, InjectionSuiteView } from '#shared/injection-suite'
+import type {
+  CyberTestRecordListItem,
+  InjectionAgent,
+  InjectionCaseEvent,
+  InjectionRunEvent,
+  InjectionRunProvider,
+  InjectionSuiteView,
+} from '#shared/injection-suite'
 
 definePageMeta({ middleware: 'signed-in' })
 useHead({ title: 'Cyber Security' })
@@ -85,13 +92,17 @@ const summary = computed(() => securitySummary(
 
 const scoreLabel = computed(() => summary.value.score === null
   ? 'Not yet scored'
-  : `${Math.round(summary.value.score * 100)}%`)
+  : percent(summary.value.score))
 
 const startedLabel = computed(() => summary.value.startedAt === 0
   ? '—'
   : new Date(summary.value.startedAt).toLocaleTimeString())
 
 const categoriesReached = computed(() => Object.keys(summary.value.categories).length)
+
+function percent(score: number): string {
+  return `${Math.round(score * 100)}%`
+}
 
 function formatDuration(ms: number): string {
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`
@@ -207,6 +218,123 @@ function accept(event: InjectionRunEvent) {
 function cancelRun() {
   controller?.abort()
 }
+
+const route = useRoute()
+const router = useRouter()
+// Anything but "past" is the run view, so a stale or hand-typed value is safe.
+const tab = computed<'run' | 'past'>(() => route.query.tab === 'past' ? 'past' : 'run')
+const tabs = [
+  { id: 'run', label: 'Run' },
+  { id: 'past', label: 'Past results' },
+] as const
+
+function setTab(next: 'run' | 'past') {
+  if (next === tab.value) return
+  void router.push({ query: { ...route.query, tab: next === 'past' ? 'past' : undefined } })
+}
+
+// The tabs follow the ARIA tab pattern: arrows move between them and focus the
+// tab that takes over.
+function onTabKeydown(event: KeyboardEvent, index: number) {
+  const step = event.key === 'ArrowRight' || event.key === 'ArrowDown'
+    ? 1
+    : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0
+  const next = step !== 0
+    ? tabIdAt(index + step)
+    : event.key === 'Home' ? tabIdAt(0) : event.key === 'End' ? tabIdAt(tabs.length - 1) : null
+  if (!next) return
+  event.preventDefault()
+  setTab(next)
+  void nextTick(() => document.getElementById(`${next}-tab`)?.focus())
+}
+
+function tabIdAt(index: number): 'run' | 'past' {
+  const wrapped = ((index % tabs.length) + tabs.length) % tabs.length
+  return tabs[wrapped]?.id ?? 'run'
+}
+
+const records = ref<CyberTestRecordListItem[]>([])
+const recordsLoading = ref(false)
+const recordsError = ref('')
+
+async function loadRecords() {
+  recordsLoading.value = true
+  recordsError.value = ''
+  try {
+    records.value = (await requestFetch<{ records: CyberTestRecordListItem[] }>('/api/admin/security-records')).records
+  }
+  catch (caught) {
+    recordsError.value = messageFrom(caught, 'Past results could not be loaded.')
+  }
+  finally {
+    recordsLoading.value = false
+  }
+}
+
+// Every visit to Past results reloads, so a run finished meanwhile is listed.
+watch(tab, (value) => {
+  if (value === 'past') void loadRecords()
+}, { immediate: true })
+
+const pendingDelete = ref<CyberTestRecordListItem | null>(null)
+const deletingId = ref<number | null>(null)
+const deleteError = ref('')
+const deleteDialog = ref<HTMLDialogElement | null>(null)
+
+function recordDate(record: CyberTestRecordListItem): string {
+  return new Date(record.startedAt).toLocaleDateString(undefined, { dateStyle: 'medium' })
+}
+
+function recordTime(record: CyberTestRecordListItem): string {
+  return new Date(record.startedAt).toLocaleTimeString(undefined, { timeStyle: 'short' })
+}
+
+function recordScore(record: CyberTestRecordListItem): string {
+  return record.score === null ? 'Not scored' : percent(record.score)
+}
+
+function stoppedLabel(stopped: CyberTestRecordListItem['stopped']): string {
+  if (stopped === 'complete') return 'Complete'
+  return stopped === 'budget' ? 'Budget reached' : 'Cancelled'
+}
+
+async function askDelete(record: CyberTestRecordListItem) {
+  pendingDelete.value = record
+  deleteError.value = ''
+  await nextTick()
+  if (deleteDialog.value && !deleteDialog.value.open) deleteDialog.value.showModal()
+}
+
+function closeDeleteDialog() {
+  deleteDialog.value?.close()
+}
+
+function onDeleteDialogClose() {
+  pendingDelete.value = null
+  deleteError.value = ''
+}
+
+async function confirmDelete() {
+  const target = pendingDelete.value
+  if (!target || deletingId.value !== null) return
+  deletingId.value = target.id
+  deleteError.value = ''
+  try {
+    await $fetch(`/api/admin/security-records/${target.id}`, { method: 'DELETE' })
+    records.value = records.value.filter(entry => entry.id !== target.id)
+    closeDeleteDialog()
+  }
+  catch (caught) {
+    deleteError.value = messageFrom(caught, 'The record could not be deleted.')
+  }
+  finally {
+    deletingId.value = null
+  }
+}
+
+function onDeleteDialogClick(event: MouseEvent) {
+  if (event.target === deleteDialog.value) closeDeleteDialog()
+}
 </script>
 
 <template>
@@ -242,6 +370,34 @@ function cancelRun() {
           </p>
         </div>
 
+        <div role="tablist" aria-label="Cyber Security views" class="flex flex-wrap gap-2">
+          <button
+            v-for="(item, index) in tabs"
+            :id="`${item.id}-tab`"
+            :key="item.id"
+            type="button"
+            role="tab"
+            :aria-selected="tab === item.id"
+            :aria-controls="`${item.id}-panel`"
+            :tabindex="tab === item.id ? 0 : -1"
+            class="inline-flex min-h-11 items-center rounded-sm border px-3 text-sm font-medium md:min-h-9"
+            :class="tab === item.id
+              ? 'border-brand-300 bg-brand-50 text-brand-700'
+              : 'border-default bg-default text-muted hover:bg-elevated'"
+            @click="setTab(item.id)"
+            @keydown="onTabKeydown($event, index)"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+
+        <div
+          v-show="tab === 'run'"
+          id="run-panel"
+          role="tabpanel"
+          aria-labelledby="run-tab"
+          class="flex flex-col gap-5"
+        >
         <dl class="grid grid-cols-2 gap-3 md:grid-cols-4">
           <div class="rounded-[8px] border border-default bg-default px-4 py-3">
             <dt class="text-xs text-muted">
@@ -451,7 +607,7 @@ function cancelRun() {
             Run the suite to see the security score, pass and leak counts, the model and the shield state.
           </p>
           <p class="text-[11px] leading-5 text-ink-500">
-            The score is the share of finished cases with no leak. Results live only on this page and are not kept, so a reload loses them.
+            The score is the share of finished cases with no leak. Results on this page last for the visit only; every finished run is also kept in Past results.
           </p>
           <ol v-if="cases.length" class="flex flex-col gap-1.5">
             <li
@@ -481,7 +637,161 @@ function cancelRun() {
             </li>
           </ol>
         </section>
+        </div>
+
+        <div
+          v-show="tab === 'past'"
+          id="past-panel"
+          role="tabpanel"
+          aria-labelledby="past-tab"
+          class="flex flex-col gap-4"
+        >
+          <p class="max-w-xl text-sm text-muted">
+            Every finished run is kept here, newest first.
+          </p>
+          <p v-if="recordsLoading" role="status" class="flex items-center gap-2 text-sm text-muted">
+            <BusySpinner class="text-brand-600" />
+            Loading past results…
+          </p>
+          <div
+            v-else-if="recordsError"
+            role="alert"
+            class="flex max-w-xl flex-wrap items-center gap-3 rounded-[8px] border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700"
+          >
+            <span>{{ recordsError }}</span>
+            <button
+              type="button"
+              class="min-h-11 rounded-sm border border-rose-300 px-3 text-sm font-medium text-rose-800 hover:bg-rose-100 md:min-h-9"
+              @click="loadRecords"
+            >
+              Retry
+            </button>
+          </div>
+          <p
+            v-else-if="records.length === 0"
+            class="rounded-[8px] border border-dashed border-ink-300 px-3 py-4 text-sm leading-5 text-ink-500"
+          >
+            No past results yet.
+          </p>
+          <ol v-else class="flex flex-col gap-2">
+            <li
+              v-for="entry in records"
+              :key="entry.id"
+              class="group flex flex-wrap items-start gap-x-3 gap-y-2 rounded-[8px] border border-default bg-default px-3 py-3 md:px-4"
+              data-record
+            >
+              <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+                <p class="text-sm font-medium text-highlighted">
+                  <time :datetime="new Date(entry.startedAt).toISOString()">{{ recordDate(entry) }}</time>
+                  · {{ recordTime(entry) }}
+                </p>
+                <p class="text-xs leading-5 text-muted">
+                  {{ stoppedLabel(entry.stopped) }} · {{ entry.finishedCases }}/{{ entry.totalCases }} cases
+                </p>
+              </div>
+              <p class="font-mono text-lg leading-6 font-semibold text-ink-900">
+                {{ recordScore(entry) }}
+              </p>
+              <button
+                type="button"
+                class="ml-auto inline-flex size-11 shrink-0 items-center justify-center rounded-sm text-rose-700 opacity-0 pointer-events-none transition-opacity hover:bg-rose-50 focus-visible:opacity-100 focus-visible:pointer-events-auto group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto max-md:opacity-100 max-md:pointer-events-auto md:size-9"
+                :aria-label="`Delete the record from ${recordDate(entry)} at ${recordTime(entry)}`"
+                :disabled="deletingId === entry.id"
+                @click="askDelete(entry)"
+              >
+                <span aria-hidden="true" class="text-xl leading-none">&times;</span>
+              </button>
+              <p
+                v-if="entry.provider === 'fake'"
+                class="basis-full rounded-sm border border-amber-200 bg-amber-50 px-[13px] py-[11px] text-xs leading-[19.5px] text-amber-900"
+              >
+                The configured provider is the fake model. These results rehearse the run; they do not test a real agent.
+              </p>
+              <dl class="grid basis-full grid-cols-2 gap-x-3 gap-y-1 border-t border-ink-200 pt-2 text-xs lg:grid-cols-4">
+                <div>
+                  <dt class="text-ink-500">
+                    Passed
+                  </dt>
+                  <dd class="font-mono font-semibold text-emerald-700">
+                    {{ entry.passed }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-ink-500">
+                    Leaked
+                  </dt>
+                  <dd class="font-mono font-semibold text-rose-700">
+                    {{ entry.leaked }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-ink-500">
+                    Model
+                  </dt>
+                  <dd class="truncate font-mono font-semibold text-ink-900" :title="entry.model">
+                    {{ entry.model }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-ink-500">
+                    VerifyShield
+                  </dt>
+                  <dd class="font-mono font-semibold" :class="entry.verifyShieldOn ? 'text-ink-900' : 'text-rose-700'">
+                    {{ entry.verifyShieldOn ? 'On' : 'Off' }}
+                  </dd>
+                </div>
+              </dl>
+            </li>
+          </ol>
+        </div>
+
+        <dialog
+          ref="deleteDialog"
+          aria-labelledby="delete-record-title"
+          class="delete-record-dialog m-auto w-[min(28rem,calc(100%-2rem))] rounded-[8px] border border-default bg-default p-0 text-default shadow-xl"
+          @close="onDeleteDialogClose"
+          @cancel.prevent="closeDeleteDialog"
+          @click="onDeleteDialogClick"
+        >
+          <div v-if="pendingDelete" class="flex flex-col gap-3 px-4 py-4 md:px-5">
+            <h2 id="delete-record-title" class="text-lg font-semibold tracking-tight text-highlighted">
+              Delete this record?
+            </h2>
+            <p class="text-sm leading-5 text-default">
+              The record from
+              <time :datetime="new Date(pendingDelete.startedAt).toISOString()">{{ recordDate(pendingDelete) }} at {{ recordTime(pendingDelete) }}</time>
+              with a score of {{ recordScore(pendingDelete) }} will be removed. This cannot be undone.
+            </p>
+            <p v-if="deleteError" role="alert" class="text-xs leading-4 text-rose-700">
+              {{ deleteError }}
+            </p>
+            <div class="flex justify-end gap-2">
+              <button
+                type="button"
+                class="min-h-11 rounded-sm border border-default px-3 text-sm font-medium text-default hover:bg-elevated md:min-h-9"
+                @click="closeDeleteDialog"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="inline-flex min-h-11 items-center gap-2 rounded-sm bg-rose-700 px-3 text-sm font-medium text-on-accent hover:bg-rose-800 disabled:opacity-60 md:min-h-9"
+                :disabled="deletingId !== null"
+                @click="confirmDelete"
+              >
+                <BusySpinner v-if="deletingId !== null" class="text-on-accent" />
+                Delete
+              </button>
+            </div>
+          </div>
+        </dialog>
       </section>
     </main>
   </div>
 </template>
+
+<style scoped>
+.delete-record-dialog::backdrop {
+  background: rgb(31 42 68 / 0.4);
+}
+</style>
