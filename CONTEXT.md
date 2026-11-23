@@ -108,8 +108,12 @@ The three hints of a module, from gentlest (1) to most direct (3). The teacher a
 _Avoid_: hint list, hint level
 
 **Course roadmap**:
-The picture of the course that shows every module, grouped into parts, as mastered, open, or closed, with the student's mastery beside it and the reason a closed module is closed. A module that its course spec lists without content stays closed as not available.
+The picture of the course that shows every module, grouped into parts, as mastered, open, or closed, with the student's mastery beside it and the reason a closed module is closed. A module that its course spec lists without content stays closed as not available. Its header shows the student's **Course progress** as "x/total modules mastered" with a bar and the percentage.
 _Avoid_: knowledge map, skill tree, course map, progress map
+
+**Course progress**:
+How far a student is through a course: the mastered modules out of the modules that have content, as a count and a whole percentage rounded down. Modules listed without content are left out, so 100% is reachable. It is derived from stored **Mastery** and never stored, and the student's roadmap and the lecturer's screens use the same derivation.
+_Avoid_: completion, course completion, overall mastery
 
 **Unlocked module**:
 A module that is open or mastered. Module 1 is unlocked from the start; each later module unlocks when the one before it is mastered, and stays unlocked even if mastery later falls or the lecturer raises the mastery threshold.
