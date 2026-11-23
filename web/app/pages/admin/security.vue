@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import AdminHeader from '~/components/admin/AdminHeader.vue'
 import BusySpinner from '~/components/BusySpinner.vue'
+import CyberCaseRow from '~/components/admin/CyberCaseRow.vue'
+import CyberRunSummary from '~/components/admin/CyberRunSummary.vue'
 import { messageFrom } from '~/admin/message'
 import type { AdminPayload } from '~/admin/decisions'
-import { injectionCategoryLabels, securitySummary } from '#shared/injection-suite'
+import { securitySummary } from '#shared/injection-suite'
 import type {
+  CyberTestRecordDetail,
   CyberTestRecordListItem,
-  InjectionAgent,
   InjectionCaseEvent,
   InjectionRunEvent,
   InjectionRunProvider,
@@ -46,17 +48,6 @@ const problems = computed(() => {
   return details?.problems ?? []
 })
 
-const agentLabels: Record<InjectionAgent, string> = { teacher: 'Teacher', deskmate: 'Mai' }
-
-function agentClass(agent: InjectionAgent): string {
-  return agent === 'teacher' ? 'bg-brand-50 text-brand-700' : 'bg-amber-50 text-amber-800'
-}
-
-const verdictStyles = {
-  pass: { border: 'border-ink-200', badge: 'bg-emerald-50 text-emerald-700', label: 'Pass' },
-  leak: { border: 'border-rose-300', badge: 'bg-rose-50 text-rose-700', label: 'Leak' },
-} as const
-
 const running = ref(false)
 const provider = ref<InjectionRunProvider | null>(null)
 const cases = ref<InjectionCaseEvent[]>([])
@@ -90,24 +81,10 @@ const summary = computed(() => securitySummary(
   startedAt.value + elapsedMs.value,
 ))
 
-const scoreLabel = computed(() => summary.value.score === null
-  ? 'Not yet scored'
-  : percent(summary.value.score))
-
-const startedLabel = computed(() => summary.value.startedAt === 0
-  ? '—'
-  : new Date(summary.value.startedAt).toLocaleTimeString())
-
 const categoriesReached = computed(() => Object.keys(summary.value.categories).length)
 
 function percent(score: number): string {
   return `${Math.round(score * 100)}%`
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`
-  const seconds = Math.round(ms / 1000)
-  return `${Math.floor(seconds / 60)} m ${String(seconds % 60).padStart(2, '0')} s`
 }
 
 async function onVerifyShield(event: Event) {
@@ -221,16 +198,35 @@ function cancelRun() {
 
 const route = useRoute()
 const router = useRouter()
-// Anything but "past" is the run view, so a stale or hand-typed value is safe.
-const tab = computed<'run' | 'past'>(() => route.query.tab === 'past' ? 'past' : 'run')
+
+// The open record comes from the URL too, so a reload, back or forward step
+// lands on the same record. A missing or unreadable id falls back to the list.
+const recordId = computed<number | null>(() => {
+  const raw = route.query.record
+  const text = Array.isArray(raw) ? raw[0] : raw
+  if (typeof text !== 'string' || !/^\d+$/.test(text)) return null
+  const id = Number(text)
+  return Number.isSafeInteger(id) && id > 0 ? id : null
+})
+
+// A record in the URL opens Past results, so a hand-typed link works.
+const tab = computed<'run' | 'past'>(() => route.query.tab === 'past' || recordId.value !== null ? 'past' : 'run')
 const tabs = [
   { id: 'run', label: 'Run' },
   { id: 'past', label: 'Past results' },
 ] as const
 
 function setTab(next: 'run' | 'past') {
-  if (next === tab.value) return
-  void router.push({ query: { ...route.query, tab: next === 'past' ? 'past' : undefined } })
+  if (next === tab.value && recordId.value === null) return
+  void router.push({ query: { ...route.query, tab: next === 'past' ? 'past' : undefined, record: undefined } })
+}
+
+function openRecord(id: number) {
+  void router.push({ query: { ...route.query, tab: 'past', record: String(id) } })
+}
+
+function showList() {
+  void router.push({ query: { ...route.query, tab: 'past', record: undefined } })
 }
 
 // The tabs follow the ARIA tab pattern: arrows move between them and focus the
@@ -274,6 +270,45 @@ async function loadRecords() {
 // Every visit to Past results reloads, so a run finished meanwhile is listed.
 watch(tab, (value) => {
   if (value === 'past') void loadRecords()
+}, { immediate: true })
+
+const detail = ref<CyberTestRecordDetail | null>(null)
+const detailLoading = ref(false)
+const detailError = ref('')
+const detailMissing = ref(false)
+// A slow answer for an earlier record must not replace the one now open.
+let detailRequest = 0
+
+async function loadDetail(id: number) {
+  const token = ++detailRequest
+  detailLoading.value = true
+  detailError.value = ''
+  detailMissing.value = false
+  detail.value = null
+  try {
+    const loaded = await requestFetch<CyberTestRecordDetail>(`/api/admin/security-records/${id}`)
+    if (token === detailRequest) detail.value = loaded
+  }
+  catch (caught) {
+    if (token !== detailRequest) return
+    if ((caught as { statusCode?: number }).statusCode === 404) detailMissing.value = true
+    else detailError.value = messageFrom(caught, 'The record could not be opened.')
+  }
+  finally {
+    if (token === detailRequest) detailLoading.value = false
+  }
+}
+
+watch(recordId, (id) => {
+  if (id === null) {
+    detailRequest += 1
+    detail.value = null
+    detailLoading.value = false
+    detailError.value = ''
+    detailMissing.value = false
+    return
+  }
+  void loadDetail(id)
 }, { immediate: true })
 
 const pendingDelete = ref<CyberTestRecordListItem | null>(null)
@@ -322,6 +357,8 @@ async function confirmDelete() {
   try {
     await $fetch(`/api/admin/security-records/${target.id}`, { method: 'DELETE' })
     records.value = records.value.filter(entry => entry.id !== target.id)
+    // Replace, not push: the deleted record must not be one Back press away.
+    if (recordId.value === target.id) void router.replace({ query: { ...route.query, tab: 'past', record: undefined } })
     closeDeleteDialog()
   }
   catch (caught) {
@@ -523,83 +560,20 @@ function onDeleteDialogClick(event: MouseEvent) {
           >
             {{ runError }}
           </p>
-          <dl
+          <CyberRunSummary
             v-if="startedAt"
-            class="grid grid-cols-2 gap-3 rounded-[6px] border border-ink-200 bg-paper px-3 py-3 sm:grid-cols-4 xl:grid-cols-9"
-          >
-            <div class="col-span-2 rounded-[4px] bg-ink-50 px-2 py-1.5 sm:col-span-1">
-              <dt class="text-[11px] text-ink-500">
-                Security score
-              </dt>
-              <dd class="mt-0.5 font-mono text-lg leading-6 font-semibold text-ink-900">
-                {{ scoreLabel }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-[11px] text-ink-500">
-                Passed
-              </dt>
-              <dd class="mt-0.5 font-mono text-sm leading-5 font-semibold text-emerald-700">
-                {{ summary.passed }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-[11px] text-ink-500">
-                Leaked
-              </dt>
-              <dd class="mt-0.5 font-mono text-sm leading-5 font-semibold text-rose-700">
-                {{ summary.leaked }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-[11px] text-ink-500">
-                Cases finished
-              </dt>
-              <dd class="mt-0.5 font-mono text-sm leading-5 font-semibold text-ink-900">
-                {{ summary.resolved }} of {{ summary.total }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-[11px] text-ink-500">
-                Categories reached
-              </dt>
-              <dd class="mt-0.5 font-mono text-sm leading-5 font-semibold text-ink-900">
-                {{ categoriesReached }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-[11px] text-ink-500">
-                Model
-              </dt>
-              <dd class="mt-0.5 truncate font-mono text-sm leading-5 font-semibold text-ink-900" :title="summary.model">
-                {{ summary.model }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-[11px] text-ink-500">
-                VerifyShield
-              </dt>
-              <dd class="mt-0.5 font-mono text-sm leading-5 font-semibold" :class="runShield === false ? 'text-rose-700' : 'text-ink-900'">
-                {{ runShield === null ? '—' : runShield ? 'On' : 'Off' }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-[11px] text-ink-500">
-                Started
-              </dt>
-              <dd class="mt-0.5 font-mono text-sm leading-5 font-semibold text-ink-900">
-                {{ startedLabel }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-[11px] text-ink-500">
-                Duration
-              </dt>
-              <dd class="mt-0.5 font-mono text-sm leading-5 font-semibold text-ink-900">
-                {{ formatDuration(summary.durationMs) }}
-              </dd>
-            </div>
-          </dl>
+            :score="summary.score"
+            not-scored-label="Not yet scored"
+            :passed="summary.passed"
+            :leaked="summary.leaked"
+            :resolved="summary.resolved"
+            :total="summary.total"
+            :categories-reached="categoriesReached"
+            :model="summary.model"
+            :shield="runShield"
+            :started-at="summary.startedAt"
+            :duration-ms="summary.durationMs"
+          />
           <p
             v-else
             class="rounded-[6px] border border-dashed border-ink-300 px-3 py-4 text-sm leading-5 text-ink-500"
@@ -610,31 +584,11 @@ function onDeleteDialogClick(event: MouseEvent) {
             The score is the share of finished cases with no leak. Results on this page last for the visit only; every finished run is also kept in Past results.
           </p>
           <ol v-if="cases.length" class="flex flex-col gap-1.5">
-            <li
+            <CyberCaseRow
               v-for="result in cases"
               :key="result.id"
-              class="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-[6px] border bg-paper px-3 py-2"
-              :class="verdictStyles[result.verdict].border"
-            >
-              <span class="min-w-0 flex-1 basis-full text-[13px] leading-5 text-ink-800 sm:basis-auto">{{ result.prompt }}</span>
-              <span
-                class="max-w-full shrink-0 rounded-[4px] bg-ink-100 px-1.5 py-0.5 text-left text-[10px] leading-[15px] font-medium text-ink-600"
-              >{{ injectionCategoryLabels[result.category] }}</span>
-              <span
-                class="shrink-0 rounded-[4px] px-1.5 py-0.5 text-[10px] leading-[15px] font-medium"
-                :class="agentClass(result.agent)"
-              >{{ agentLabels[result.agent] }}</span>
-              <span
-                class="shrink-0 rounded-[4px] px-1.5 py-0.5 text-[10px] leading-[15px] font-medium"
-                :class="verdictStyles[result.verdict].badge"
-              >{{ verdictStyles[result.verdict].label }}</span>
-              <span v-if="result.leakedFragment" class="basis-full font-mono text-[11px] leading-5 text-rose-700">
-                leaked: {{ result.leakedFragment }}
-              </span>
-              <span v-if="result.replyExcerpt" class="basis-full text-[11px] leading-5 text-ink-500">
-                {{ result.replyExcerpt }}
-              </span>
-            </li>
+              :result="result"
+            />
           </ol>
         </section>
         </div>
@@ -646,103 +600,206 @@ function onDeleteDialogClick(event: MouseEvent) {
           aria-labelledby="past-tab"
           class="flex flex-col gap-4"
         >
-          <p class="max-w-xl text-sm text-muted">
-            Every finished run is kept here, newest first.
-          </p>
-          <p v-if="recordsLoading" role="status" class="flex items-center gap-2 text-sm text-muted">
-            <BusySpinner class="text-brand-600" />
-            Loading past results…
-          </p>
-          <div
-            v-else-if="recordsError"
-            role="alert"
-            class="flex max-w-xl flex-wrap items-center gap-3 rounded-[8px] border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700"
-          >
-            <span>{{ recordsError }}</span>
-            <button
-              type="button"
-              class="min-h-11 rounded-sm border border-rose-300 px-3 text-sm font-medium text-rose-800 hover:bg-rose-100 md:min-h-9"
-              @click="loadRecords"
+          <template v-if="recordId === null">
+            <p class="max-w-xl text-sm text-muted">
+              Every finished run is kept here, newest first.
+            </p>
+            <p v-if="recordsLoading" role="status" class="flex items-center gap-2 text-sm text-muted">
+              <BusySpinner class="text-brand-600" />
+              Loading past results…
+            </p>
+            <div
+              v-else-if="recordsError"
+              role="alert"
+              class="flex max-w-xl flex-wrap items-center gap-3 rounded-[8px] border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700"
             >
-              Retry
-            </button>
-          </div>
-          <p
-            v-else-if="records.length === 0"
-            class="rounded-[8px] border border-dashed border-ink-300 px-3 py-4 text-sm leading-5 text-ink-500"
-          >
-            No past results yet.
-          </p>
-          <ol v-else class="flex flex-col gap-2">
-            <li
-              v-for="entry in records"
-              :key="entry.id"
-              class="group flex flex-wrap items-start gap-x-3 gap-y-2 rounded-[8px] border border-default bg-default px-3 py-3 md:px-4"
-              data-record
-            >
-              <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                <p class="text-sm font-medium text-highlighted">
-                  <time :datetime="new Date(entry.startedAt).toISOString()">{{ recordDate(entry) }}</time>
-                  · {{ recordTime(entry) }}
-                </p>
-                <p class="text-xs leading-5 text-muted">
-                  {{ stoppedLabel(entry.stopped) }} · {{ entry.finishedCases }}/{{ entry.totalCases }} cases
-                </p>
-              </div>
-              <p class="font-mono text-lg leading-6 font-semibold text-ink-900">
-                {{ recordScore(entry) }}
-              </p>
+              <span>{{ recordsError }}</span>
               <button
                 type="button"
-                class="ml-auto inline-flex size-11 shrink-0 items-center justify-center rounded-sm text-rose-700 opacity-0 pointer-events-none transition-opacity hover:bg-rose-50 focus-visible:opacity-100 focus-visible:pointer-events-auto group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto max-md:opacity-100 max-md:pointer-events-auto md:size-9"
-                :aria-label="`Delete the record from ${recordDate(entry)} at ${recordTime(entry)}`"
-                :disabled="deletingId === entry.id"
-                @click="askDelete(entry)"
+                class="min-h-11 rounded-sm border border-rose-300 px-3 text-sm font-medium text-rose-800 hover:bg-rose-100 md:min-h-9"
+                @click="loadRecords"
               >
-                <span aria-hidden="true" class="text-xl leading-none">&times;</span>
+                Retry
               </button>
+            </div>
+            <p
+              v-else-if="records.length === 0"
+              class="rounded-[8px] border border-dashed border-ink-300 px-3 py-4 text-sm leading-5 text-ink-500"
+            >
+              No past results yet.
+            </p>
+            <ol v-else class="flex flex-col gap-2">
+              <li
+                v-for="entry in records"
+                :key="entry.id"
+                class="group flex flex-wrap items-start gap-x-3 gap-y-2 rounded-[8px] border border-default bg-default px-3 py-3 md:px-4"
+                data-record
+              >
+                <button
+                  type="button"
+                  class="flex min-w-0 flex-1 flex-wrap items-start gap-x-3 gap-y-2 rounded-sm text-left"
+                  :aria-label="`Open the record from ${recordDate(entry)} at ${recordTime(entry)}`"
+                  @click="openRecord(entry.id)"
+                >
+                  <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span class="text-sm font-medium text-highlighted underline-offset-2 group-hover:underline">
+                      <time :datetime="new Date(entry.startedAt).toISOString()">{{ recordDate(entry) }}</time>
+                      · {{ recordTime(entry) }}
+                    </span>
+                    <span class="text-xs leading-5 text-muted">
+                      {{ stoppedLabel(entry.stopped) }} · {{ entry.finishedCases }}/{{ entry.totalCases }} cases
+                    </span>
+                  </span>
+                  <span class="font-mono text-lg leading-6 font-semibold text-ink-900">
+                    {{ recordScore(entry) }}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class="ml-auto inline-flex size-11 shrink-0 items-center justify-center rounded-sm text-rose-700 opacity-0 pointer-events-none transition-opacity hover:bg-rose-50 focus-visible:opacity-100 focus-visible:pointer-events-auto group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto max-md:opacity-100 max-md:pointer-events-auto md:size-9"
+                  :aria-label="`Delete the record from ${recordDate(entry)} at ${recordTime(entry)}`"
+                  :disabled="deletingId === entry.id"
+                  @click.stop="askDelete(entry)"
+                >
+                  <span aria-hidden="true" class="text-xl leading-none">&times;</span>
+                </button>
+                <p
+                  v-if="entry.provider === 'fake'"
+                  class="basis-full rounded-sm border border-amber-200 bg-amber-50 px-[13px] py-[11px] text-xs leading-[19.5px] text-amber-900"
+                >
+                  The configured provider is the fake model. These results rehearse the run; they do not test a real agent.
+                </p>
+                <dl class="grid basis-full grid-cols-2 gap-x-3 gap-y-1 border-t border-ink-200 pt-2 text-xs lg:grid-cols-4">
+                  <div>
+                    <dt class="text-ink-500">
+                      Passed
+                    </dt>
+                    <dd class="font-mono font-semibold text-emerald-700">
+                      {{ entry.passed }}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-ink-500">
+                      Leaked
+                    </dt>
+                    <dd class="font-mono font-semibold text-rose-700">
+                      {{ entry.leaked }}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-ink-500">
+                      Model
+                    </dt>
+                    <dd class="truncate font-mono font-semibold text-ink-900" :title="entry.model">
+                      {{ entry.model }}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-ink-500">
+                      VerifyShield
+                    </dt>
+                    <dd class="font-mono font-semibold" :class="entry.verifyShieldOn ? 'text-ink-900' : 'text-rose-700'">
+                      {{ entry.verifyShieldOn ? 'On' : 'Off' }}
+                    </dd>
+                  </div>
+                </dl>
+              </li>
+            </ol>
+          </template>
+
+          <template v-else>
+            <div class="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                class="inline-flex min-h-11 items-center rounded-sm border border-default px-3 text-sm font-medium text-default hover:bg-elevated md:min-h-9"
+                @click="showList"
+              >
+                Back to past results
+              </button>
+            </div>
+            <p v-if="detailLoading" role="status" class="flex items-center gap-2 text-sm text-muted">
+              <BusySpinner class="text-brand-600" />
+              Opening the record…
+            </p>
+            <p
+              v-else-if="detailMissing"
+              role="alert"
+              class="max-w-xl rounded-[8px] border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700"
+            >
+              That record could not be opened.
+            </p>
+            <div
+              v-else-if="detailError"
+              role="alert"
+              class="flex max-w-xl flex-wrap items-center gap-3 rounded-[8px] border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700"
+            >
+              <span>{{ detailError }}</span>
+              <button
+                type="button"
+                class="min-h-11 rounded-sm border border-rose-300 px-3 text-sm font-medium text-rose-800 hover:bg-rose-100 md:min-h-9"
+                @click="recordId !== null && loadDetail(recordId)"
+              >
+                Retry
+              </button>
+            </div>
+            <section
+              v-else-if="detail"
+              class="flex min-w-0 flex-col gap-3 rounded-[8px] border border-ink-200 bg-default px-4 py-4 md:px-5"
+              data-record-detail
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="flex min-w-0 flex-col gap-0.5">
+                  <h2 class="text-lg font-semibold tracking-tight text-highlighted">
+                    <time :datetime="new Date(detail.startedAt).toISOString()">{{ recordDate(detail) }}</time>
+                    · {{ recordTime(detail) }}
+                  </h2>
+                  <p class="text-sm leading-5 text-muted">
+                    {{ stoppedLabel(detail.stopped) }} · {{ detail.finishedCases }} of {{ detail.totalCases }} cases
+                  </p>
+                  <p class="text-xs leading-5 text-ink-500">
+                    A saved record is read-only: it cannot run again or be edited.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="inline-flex min-h-11 items-center rounded-sm border border-rose-300 px-3 text-sm font-medium text-rose-800 hover:bg-rose-50 md:min-h-9"
+                  @click="askDelete(detail)"
+                >
+                  Delete this record
+                </button>
+              </div>
               <p
-                v-if="entry.provider === 'fake'"
-                class="basis-full rounded-sm border border-amber-200 bg-amber-50 px-[13px] py-[11px] text-xs leading-[19.5px] text-amber-900"
+                v-if="detail.provider === 'fake'"
+                role="status"
+                class="rounded-sm border border-amber-200 bg-amber-50 px-[13px] py-[11px] text-xs leading-[19.5px] text-amber-900"
               >
                 The configured provider is the fake model. These results rehearse the run; they do not test a real agent.
               </p>
-              <dl class="grid basis-full grid-cols-2 gap-x-3 gap-y-1 border-t border-ink-200 pt-2 text-xs lg:grid-cols-4">
-                <div>
-                  <dt class="text-ink-500">
-                    Passed
-                  </dt>
-                  <dd class="font-mono font-semibold text-emerald-700">
-                    {{ entry.passed }}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-ink-500">
-                    Leaked
-                  </dt>
-                  <dd class="font-mono font-semibold text-rose-700">
-                    {{ entry.leaked }}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-ink-500">
-                    Model
-                  </dt>
-                  <dd class="truncate font-mono font-semibold text-ink-900" :title="entry.model">
-                    {{ entry.model }}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-ink-500">
-                    VerifyShield
-                  </dt>
-                  <dd class="font-mono font-semibold" :class="entry.verifyShieldOn ? 'text-ink-900' : 'text-rose-700'">
-                    {{ entry.verifyShieldOn ? 'On' : 'Off' }}
-                  </dd>
-                </div>
-              </dl>
-            </li>
-          </ol>
+              <CyberRunSummary
+                :score="detail.score"
+                not-scored-label="Not scored"
+                :passed="detail.passed"
+                :leaked="detail.leaked"
+                :resolved="detail.finishedCases"
+                :total="detail.totalCases"
+                :categories-reached="Object.keys(detail.categories).length"
+                :model="detail.model"
+                :shield="detail.verifyShieldOn"
+                :started-at="detail.startedAt"
+                :duration-ms="detail.durationMs"
+              />
+              <p class="text-[11px] leading-5 text-ink-500">
+                The score is the share of finished cases with no leak.
+              </p>
+              <ol v-if="detail.cases.length" class="flex flex-col gap-1.5">
+                <CyberCaseRow
+                  v-for="result in detail.cases"
+                  :key="result.id"
+                  :result="result"
+                />
+              </ol>
+            </section>
+          </template>
         </div>
 
         <dialog
