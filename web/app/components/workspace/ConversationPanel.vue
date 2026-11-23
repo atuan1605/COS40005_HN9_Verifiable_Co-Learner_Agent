@@ -319,9 +319,6 @@ watch(() => props.sending, (sending) => {
             aria-hidden="true"
           />
         </div>
-        <p class="font-mono text-[10px] leading-[15px] text-ink-400 max-md:hidden">
-          Teacher + Deskmate
-        </p>
       </div>
       <div class="flex shrink-0 items-center gap-2">
         <span
