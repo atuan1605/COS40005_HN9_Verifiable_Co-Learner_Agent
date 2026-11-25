@@ -1,0 +1,26 @@
+{
+  "task": "prompt_content",
+  "modelVersion": "prompt-content-v1",
+  "featureVersion": "hashed-char-tfidf-v1",
+  "featureDescription": "Hashed character 3–5-grams with TF-IDF",
+  "formatVersion": 1,
+  "artifact": "self-harm-text-model.npz",
+  "sha256": "fd58ad84bba1b58131b57c4ce4f1ecdc6dbad9c7db0319e1719f009badea677b",
+  "threshold": 0.4136048173830935,
+  "language": "en",
+  "positiveLabel": "sh_content",
+  "negativeLabel": "other_content",
+  "meaning": "Scores English text for the historical self-harm content label (SH). The label describes the text.",
+  "evaluationStatus": "experimental",
+  "evaluation": {
+    "dataset": "OpenAI moderation benchmark (historical SH label)",
+    "revision": "d3938df6ce8b06c2907f92c6084d8192da61b9aa",
+    "holdoutCount": 289,
+    "positiveCount": 10,
+    "averagePrecision": 0.659,
+    "constantScoreAveragePrecision": 0.035,
+    "precision": 0.533,
+    "recall": 0.800,
+    "f1": 0.640
+  }
+}

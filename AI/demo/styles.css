@@ -1,0 +1,80 @@
+/* The local service prepends the shared Co-Learner palette. */
+:root {
+  color-scheme: light;
+  font-family: Inter, system-ui, sans-serif;
+  line-height: 1.55;
+  color: var(--color-ink-900);
+  background: var(--color-ink-100);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 52rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1, h2, p { margin-block: 0; }
+h1 { font-size: clamp(2.25rem, 6vw, 3.5rem); line-height: 1.1; }
+h2 { font-size: 1.35rem; }
+.intro { display: grid; gap: .5rem; margin-block-end: 1.75rem; }
+.project { color: var(--color-accent-hover); font-weight: 650; }
+.panel {
+  padding: clamp(1rem, 4vw, 1.75rem);
+  background: var(--color-paper);
+  border: 1px solid var(--color-ink-200);
+  border-radius: 1rem;
+  margin-block: 1rem;
+}
+form { display: grid; gap: .5rem; margin-block-start: 1rem; }
+label, summary { font-weight: 650; }
+textarea {
+  width: 100%;
+  padding: .8rem;
+  border: 1px solid var(--color-brand-500);
+  border-radius: .5rem;
+  resize: vertical;
+  font: inherit;
+  color: inherit;
+}
+.help, dt { color: var(--color-ink-600); font-size: .9rem; }
+button {
+  justify-self: start;
+  border: 0;
+  border-radius: .5rem;
+  padding: .65rem 1rem;
+  margin-block-start: .4rem;
+  font: inherit;
+  font-weight: 650;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  cursor: pointer;
+}
+button:hover { background: var(--color-accent-hover); }
+button:disabled { opacity: .65; cursor: wait; }
+:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 3px; }
+summary { cursor: pointer; }
+details p { margin-block-start: .8rem; }
+dl { display: grid; gap: .75rem; margin: .75rem 0 0; }
+details dl { grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
+dd { margin: 0; overflow-wrap: anywhere; }
+#prompt-result, #activity-result, #forecast-result {
+  margin-block-start: 1rem;
+  border: 1px solid var(--color-brand-200);
+  background: var(--color-brand-50);
+  border-radius: .65rem;
+  padding: .85rem;
+}
+#prompt-result[data-kind="error"] { font-weight: 600; }
+#prompt-result dl { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); }
+.result-label { font-size: 1.1rem; font-weight: 650; }
+.activity-controls { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
+.activity-input, .activity-sample { display: grid; gap: .4rem; margin-block: .75rem; }
+.activity-input textarea { font-family: ui-monospace, monospace; }
+.activity-sample select {
+  justify-self: start;
+  max-width: 100%;
+  padding: .5rem;
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--color-brand-500);
+  border-radius: .5rem;
+  background-color: var(--color-paper);
+}
+.activity-model { margin-block-start: .85rem; }

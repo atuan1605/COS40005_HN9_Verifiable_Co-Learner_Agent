@@ -1,0 +1,234 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme static {
+  --font-sans: 'Inter', sans-serif;
+}
+
+/* ---- Colour: the "Tranquil Academic Study Sanctuary" palette ----
+   Source colours: #4B8BBE #A3C6E8 #F3F4F6 #1F2A44 #6C757D. Light theme only.
+   White paper cards on a #F3F4F6 ground, navy ink, palette blue for accents.
+   ink is the neutral scale (navy-tinted greys), brand the blue scale. The role
+   tokens below them name surfaces with a fixed job: accent (filled buttons),
+   self (the student's own bubble), feature (navy highlight blocks) and
+   roadmap-line. */
+@theme static {
+  --color-paper: #ffffff;
+
+  --color-ink-50: #f7f8fa;
+  --color-ink-100: #f3f4f6;
+  --color-ink-200: #dce3ea;
+  --color-ink-300: #cdd5de;
+  --color-ink-400: #98a1ab;
+  --color-ink-500: #6c757d;
+  --color-ink-600: #525c6a;
+  --color-ink-700: #3b4559;
+  --color-ink-800: #2a3550;
+  --color-ink-900: #1f2a44;
+  --color-ink-950: #141b2d;
+
+  --color-brand-50: #eef5fb;
+  --color-brand-100: #dceaf6;
+  --color-brand-200: #c4dbf0;
+  --color-brand-300: #a3c6e8;
+  --color-brand-400: #73a6d3;
+  --color-brand-500: #4b8bbe;
+  --color-brand-600: #36719f;
+  --color-brand-700: #2c5d84;
+  --color-brand-800: #244c6b;
+  --color-brand-900: #1d3d57;
+  --color-brand-950: #132738;
+
+  --color-accent: #36719f; /* #4B8BBE darkened: white text passes AA (5.2:1) */
+  --color-accent-hover: #2c5d84;
+  --color-on-accent: #ffffff;
+  --color-self: #cce0f2; /* #A3C6E8 at 55% on white, set apart from the teacher's paler bubble */
+  --color-on-self: #1f2a44;
+  --color-feature: #1f2a44;
+  --color-on-feature: #f3f4f6;
+  --color-feature-muted: #a9b3c1;
+  --color-feature-accent: #a3c6e8;
+  --color-feature-line: #33415f;
+  --color-roadmap-line: #1f2a44;
+}
+
+/* Nuxt UI's semantic colours, pinned to the palette steps above. */
+:root {
+  --ui-primary: var(--color-accent);
+  --ui-bg: var(--color-paper);
+  --ui-bg-muted: var(--ui-color-neutral-50);
+  --ui-bg-elevated: var(--ui-color-neutral-100);
+  --ui-bg-accented: var(--ui-color-neutral-200);
+  --ui-bg-inverted: var(--color-feature);
+  --ui-text-dimmed: var(--ui-color-neutral-400);
+  --ui-text-muted: var(--ui-color-neutral-500);
+  --ui-text-toned: var(--ui-color-neutral-600);
+  --ui-text: var(--ui-color-neutral-700);
+  --ui-text-highlighted: var(--ui-color-neutral-900);
+  --ui-text-inverted: var(--color-on-accent);
+  --ui-border: var(--ui-color-neutral-200);
+  --ui-border-muted: var(--ui-color-neutral-200);
+  --ui-border-accented: var(--ui-color-neutral-300);
+  --ui-border-inverted: var(--color-feature);
+}
+
+:root {
+  --python-editor-font-size: 14px;
+}
+
+/* Phone padding stays clear of a notch and the home indicator. */
+@media (width < 48rem) {
+  :root {
+    --python-editor-font-size: 16px;
+  }
+
+  .phone-safe,
+  .phone-safe-top,
+  .phone-safe-bottom {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+
+  .phone-safe,
+  .phone-safe-top {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+
+  .phone-safe,
+  .phone-safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* ---- UI polish layer: type rendering, interaction states, focus, scroll ---- */
+@theme static {
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'cv11', 'ss03';
+}
+
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
+
+::selection { background: color-mix(in oklab, var(--color-brand-500) 24%, transparent); }
+
+/* One keyboard focus ring for every control. */
+:where(a, button, [role='tab'], summary, input, textarea, select):focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+:where(input, textarea):focus-visible { outline-offset: 0; }
+/* The chat composer's box shows focus on its own border, edge to edge. */
+[data-composer-input]:focus-visible { outline: none; }
+
+/* Controls answer the pointer: colour steps on hover, a press sinks 1px. */
+:where(a, button, [role='tab'], input, textarea) {
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 90ms ease;
+}
+:where(button, [role='tab'], a[href]):not(:disabled):active { transform: translateY(1px); }
+:where(button, [role='tab']):not(:disabled) { cursor: pointer; }
+
+/* Quiet, thin scrollbars inside panels. */
+* { scrollbar-width: thin; scrollbar-color: var(--color-ink-300) transparent; }
+
+/* Code reads as code everywhere it appears. */
+:where(code, pre, kbd) { font-family: var(--font-mono); font-variant-ligatures: none; }
+
+/* ---- Page transitions (View Transitions API) ----
+   The old view steps out quickly; the new one fades up 6px. The workspace bar
+   carries its own name, so it holds still while Study and Mindmap swap. */
+::view-transition-old(root) {
+  animation: vt-out 120ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+::view-transition-new(root) {
+  animation: vt-in 260ms cubic-bezier(0.16, 1, 0.3, 1) 40ms both;
+}
+::view-transition-group(app-header) { animation-duration: 0s; }
+main[data-layout] > header { view-transition-name: app-header; }
+
+@keyframes vt-out {
+  to { opacity: 0; }
+}
+@keyframes vt-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+/* First paint of every page enters once. */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(4px); }
+}
+.page-enter { animation: page-enter 320ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Mermaid measures its labels while it draws (the temporary `ddiagram-*`
+   container, then the `diagram-*` svg). The reduced-motion rule above gives
+   every element a 0.01ms transition, and with it Mermaid measures an empty
+   edge label as about 2000px wide, so a two-node diagram comes out 2200px
+   across and is shrunk to the column with unreadable text. A diagram has
+   nothing to animate, so it keeps no transitions. */
+[id^='ddiagram-'],
+[id^='ddiagram-'] *,
+svg[id^='diagram-'],
+svg[id^='diagram-'] * {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Sign-in intro (first visit per device): app/sign-in/intro.ts marks <html>
+   before paint; the page takes over with the Web Animations API. If the
+   script never runs, the hidden parts still appear after 3s. */
+@keyframes intro-failsafe {
+  to { opacity: 1; }
+}
+html[data-intro] :is([data-intro-lockup], [data-intro-rise]) {
+  opacity: 0;
+  animation: intro-failsafe 1ms linear 3s both;
+}
+
+/* About hero: each part rises once on load, one after another. */
+@keyframes about-rise {
+  from { opacity: 0; transform: translateY(10px); }
+}
+.about-rise {
+  animation: about-rise 560ms cubic-bezier(0.16, 1, 0.3, 1) calc(var(--i, 0) * 110ms) both;
+}
+
+/* Browser autofill keeps the field's own white ground instead of its yellow,
+   and keeps its border: the outline is a box-shadow, so it is layered back in. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover {
+  -webkit-box-shadow: inset 0 0 0 1px var(--color-ink-300), inset 0 0 0 1000px var(--color-paper);
+  box-shadow: inset 0 0 0 1px var(--color-ink-300), inset 0 0 0 1000px var(--color-paper);
+  -webkit-text-fill-color: var(--color-ink-900);
+  caret-color: var(--color-ink-900);
+}
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: inset 0 0 0 2px var(--color-brand-500), inset 0 0 0 1000px var(--color-paper);
+  box-shadow: inset 0 0 0 2px var(--color-brand-500), inset 0 0 0 1000px var(--color-paper);
+  -webkit-text-fill-color: var(--color-ink-900);
+}

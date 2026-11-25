@@ -1,0 +1,7 @@
+numpy==2.4.4
+scipy==1.17.0
+scikit-learn==1.8.0
+matplotlib==3.10.8
+polars==1.39.3
+nbconvert==7.16.6
+ipykernel==7.2.0

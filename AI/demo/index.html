@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Co-Learner ML Lab</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <main>
+    <header class="intro">
+      <p class="project">Verifiable Co-Learner</p>
+      <h1>ML Lab</h1>
+      <p>Try prompt classification, editor activity classification and a first-submission forecast. Inference runs on this machine.</p>
+    </header>
+    <section class="panel" aria-labelledby="prompt-heading">
+      <h2 id="prompt-heading">Prompt classification</h2>
+      <form id="prompt-form">
+        <label for="prompt">English prompt</label>
+        <textarea id="prompt" rows="5" maxlength="4000" autocomplete="off" spellcheck="false"
+          aria-describedby="prompt-help" placeholder="Why does my Python loop skip an item?"></textarea>
+        <p class="help" id="prompt-help">The model scores text for the historical self-harm content label.</p>
+        <button type="submit">Classify prompt</button>
+      </form>
+      <div id="prompt-result" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+    </section>
+    <section class="panel" aria-labelledby="activity-heading">
+      <h2 id="activity-heading">Editor activity classification</h2>
+      <p class="help">Type, delete or paste during a two-minute observation. The model receives aggregate counts.</p>
+      <div class="activity-controls">
+        <button id="start-observation" type="button">Start live observation</button>
+        <button id="reset-observation" type="button" disabled>Reset observation</button>
+      </div>
+      <div class="activity-input">
+        <label for="activity-editor">Demo editor</label>
+        <textarea id="activity-editor" rows="4" maxlength="16000" spellcheck="false" autocomplete="off" disabled></textarea>
+      </div>
+      <div class="activity-sample">
+        <label for="activity-sample">Load a synthetic sample</label>
+        <select id="activity-sample">
+          <option value="">Choose a sample</option>
+          <option value="editing">Sustained edits</option>
+          <option value="quiet">Quiet window</option>
+        </select>
+      </div>
+      <p id="observation-progress" class="help" aria-live="off"></p>
+      <p id="observation-counts" class="help"></p>
+      <button id="classify-activity" type="button" disabled>Classify activity</button>
+      <div id="activity-result" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+      <details class="activity-model">
+        <summary>Editor model evaluation</summary>
+        <p id="activity-model-details">Loading model information…</p>
+      </details>
+    </section>
+    <section class="panel" aria-labelledby="forecast-heading">
+      <h2 id="forecast-heading">First-submission forecast</h2>
+      <p class="help">Classify an editor window above to see the forecast for the first recorded submission in the next ten minutes.</p>
+      <div id="forecast-result" aria-live="polite" aria-atomic="true">Start an observation or choose a sample.</div>
+      <button id="mark-submitted" type="button" disabled>Mark demo exercise submitted</button>
+      <details class="activity-model">
+        <summary>Submission model evaluation</summary>
+        <p id="forecast-model-details">Loading model information…</p>
+      </details>
+    </section>
+  </main>
+</body>
+</html>
