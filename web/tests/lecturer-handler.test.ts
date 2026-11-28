@@ -55,7 +55,13 @@ describe('lecturer handler', () => {
         enrolledCount: 2,
         masteryThreshold: 0.9,
         history: [seeded],
-        students: students.map(student => ({ ...student, progress: { mastered: 0, total: pythonCourse.modules.filter(module => module.available).length, percent: 0 } })),
+        modules: pythonCourse.modules.map(({ id, name }) => ({ id, name })),
+        students: students.map(student => ({
+          ...student,
+          progress: { mastered: 0, total: pythonCourse.modules.filter(module => module.available).length, percent: 0 },
+          // A student with no evidence yet has only the first module open.
+          moduleStates: Object.fromEntries(pythonCourse.modules.map((module, index) => [module.id, index === 0 ? 'open' : 'closed'])),
+        })),
       }],
     })
   })
@@ -173,6 +179,39 @@ describe('lecturer handler', () => {
     ])
     expect(JSON.stringify(response)).not.toContain('masteries')
     expect(JSON.stringify(response)).not.toContain('else@example.com')
+  })
+
+  it('gives every module\'s state for each enrolled student of an owned course only, agreeing with Course progress', async () => {
+    const store = createMemoryLecturerStore([
+      {
+        ...python,
+        students: [
+          { ...students[0]!, masteries: [row('m1', 0.95, true), row('m2', 0.4, true), row('m3', 0, false), row('m4', 0, false)] },
+          { ...students[1]!, masteries: [row('m1', 0.4, true), row('m2', 0, false), row('m3', 0, false), row('m4', 0, false)] },
+        ],
+      },
+      { ...python, ownerEmail: 'other@example.com', id: 'other', students: [{ ...students[0]!, email: 'else@example.com' }] },
+    ])
+
+    const response = await handleLecturer({ email: 'lecturer@example.com', lecturerEmails, store, courses: createMemoryCourseStore([small()]) })
+
+    expect(response.courses.map(course => course.id)).toEqual(['intro_python'])
+    const course = response.courses[0]!
+    expect(course.modules).toEqual(['m1', 'm2', 'm3', 'm4'].map(id => ({ id, name: id })))
+    expect(course.students.map(student => student.moduleStates)).toEqual([
+      { m1: 'mastered', m2: 'open', m3: 'closed', m4: 'closed' },
+      { m1: 'open', m2: 'closed', m3: 'closed', m4: 'closed' },
+    ])
+    expect(course.students.map(student => student.progress.mastered)).toEqual([1, 0])
+    expect(JSON.stringify(response)).not.toContain('else@example.com')
+  })
+
+  it('gives an administrator who owns no course no Course insights', async () => {
+    const store = createMemoryLecturerStore([python])
+    // Not on the lecturer allowlist: refused outright.
+    await expect(handleLecturer({ email: 'owner@example.com', lecturerEmails, store })).rejects.toMatchObject({ statusCode: 403 })
+    // Also a lecturer, but of no course here: nothing about another lecturer's students.
+    await expect(handleLecturer({ email: 'owner@example.com', lecturerEmails: 'owner@example.com', store })).resolves.toEqual({ courses: [] })
   })
 
   it.each([0.49, 1, NaN, '0.8'])('rejects invalid threshold %s before writing', async (threshold) => {
