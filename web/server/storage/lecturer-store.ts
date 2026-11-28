@@ -3,17 +3,19 @@ import type { CourseSpec } from '../course'
 import type { StoredMastery } from '../student-model'
 
 // What the store reads for an owned course: the enrolled students with their stored mastery rows and
-// recorded unlocks, so the handler can derive each student's Course progress (ADR 0013). The id is
-// for reading the student's evidence and is not sent.
-export interface LecturerCourseRecord extends Omit<LecturerCourse, 'students'> {
-  students: (Omit<LecturerStudent, 'progress'> & { id: string, masteries: StoredMastery[], unlocks: string[] })[]
+// recorded unlocks, so the handler can derive each student's Course progress and module states
+// (ADR 0013). The id is for reading the student's evidence and is not sent.
+type StoredStudent = Omit<LecturerStudent, 'progress' | 'moduleStates'>
+
+export interface LecturerCourseRecord extends Omit<LecturerCourse, 'students' | 'modules'> {
+  students: (StoredStudent & { id: string, masteries: StoredMastery[], unlocks: string[] })[]
 }
 
-type SeededCourse = Omit<LecturerCourse, 'students'> & {
+type SeededCourse = Omit<LecturerCourse, 'students' | 'modules'> & {
   ownerEmail: string
   spec?: CourseSpec
   draft?: CourseSpec | null
-  students: (Omit<LecturerStudent, 'progress'> & { id?: string, masteries?: StoredMastery[], unlocks?: string[] })[]
+  students: (StoredStudent & { id?: string, masteries?: StoredMastery[], unlocks?: string[] })[]
 }
 
 export interface LecturerStore {

@@ -68,7 +68,8 @@ export async function handleLecturer(request: LecturerIdentity & {
 
 // Course progress for each enrolled student of an owned course, from the same stored mastery the
 // student and the agents read (ADR 0013), judged by the roadmap's own module states: recorded and
-// legacy unlocks count, and missing rows are rebuilt from evidence. The stored rows are not sent.
+// legacy unlocks count, and missing rows are rebuilt from evidence. The same standings give each
+// module's state for Course insights. The stored rows are not sent.
 async function withProgress(
   { students, ...course }: LecturerCourseRecord,
   courses: CourseStore,
@@ -78,12 +79,14 @@ async function withProgress(
   const ledger = evidence?.(course.id)
   return {
     ...course,
+    modules: studied.modules.map(({ id, name }) => ({ id, name })),
     students: await Promise.all(students.map(async ({ id, masteries, unlocks, ...student }) => {
       const observations = ledger && needsEvidence(studied, masteries) ? await ledger.forStudent(id) : []
       const standings = moduleStandings(studied, { stored: masteries, evidence: observations, recordedUnlocks: unlocks })
       return {
         ...student,
-        progress: courseProgress(studied.modules.map((module, index) => ({ available: module.available, state: standings[index]!.state }))),
+        progress: courseProgress(standings),
+        moduleStates: Object.fromEntries(standings.map(({ moduleId, state }) => [moduleId, state])),
       }
     })),
   }
