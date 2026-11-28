@@ -39,8 +39,20 @@ export interface ReviewMessage {
   time: string | null
 }
 
-export interface ReviewConversation {
+// One module's conversation as the review lists it; its messages are read on a page of their own.
+export interface ReviewConversationSummary {
   moduleId: string
+  moduleName: string
+  messageCount: number
+  // When the latest message was sent; null when no message kept a time.
+  latestAt: string | null
+}
+
+// One module's conversation with a student, every message oldest first.
+export interface StaffConversation {
+  student: ReviewedStudent
+  moduleId: string
+  moduleName: string
   messages: ReviewMessage[]
 }
 
@@ -104,7 +116,8 @@ export interface StaffReview {
   // The most recent activity, newest first.
   activity: ReviewEvent[]
   submissions: ReviewSubmission[]
-  conversations: ReviewConversation[]
+  // Newest first.
+  conversations: ReviewConversationSummary[]
   signals: ReviewSignal[]
   plans: ReviewPlan[]
   learningPattern: ReviewLearningPattern
@@ -119,5 +132,10 @@ export interface StaffAccessEntry {
   actorRole: 'administrator' | 'lecturer'
   studentId: string
   studentNumber: string | null
-  opened: 'student_review'
+  opened: 'student_review' | 'student_conversation'
+  courseId: string | null
+  // The module whose conversation was opened; null for a review.
+  moduleId: string | null
+  // That module's name, filled in for the administrator's page.
+  moduleName: string | null
 }

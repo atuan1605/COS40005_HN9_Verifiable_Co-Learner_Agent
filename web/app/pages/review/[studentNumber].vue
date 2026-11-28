@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { StaffReview } from '#shared/staff-review'
+import ConversationList from '~/components/review/ConversationList.vue'
 import { isProductOwner } from '~/staff/landing'
 
 definePageMeta({ middleware: 'signed-in' })
@@ -69,7 +70,6 @@ function duration(seconds: number): string {
 }
 const planState = (revision: { agreedAt: string | null }) => revision.agreedAt ? 'Agreed' : 'Proposed'
 
-const authors: Record<string, string> = { student: 'Student', teacher: 'Teacher', deskmate: 'Mai', event: 'System' }
 const outcomes: Record<string, string> = { passed: 'Passed', failed: 'Failed', refused: 'Not checked' }
 const signalTitles: Record<string, string> = {
   large_paste_then_pass: 'A large paste came before a pass',
@@ -303,29 +303,7 @@ const pagedSignals = computed(() => (data.value?.signals ?? []).slice((signalPag
           </article>
         </section>
 
-        <section aria-labelledby="conversation-heading" class="flex flex-col gap-3">
-          <h2 id="conversation-heading" class="text-base font-semibold text-highlighted">
-            Conversation
-          </h2>
-          <p v-if="!data.conversations.length" class="text-sm text-muted">
-            No conversation yet.
-          </p>
-          <div v-for="conversation in data.conversations" :key="conversation.moduleId" class="rounded-lg border border-default bg-default p-3 shadow-xs">
-            <h3 class="text-sm font-medium text-highlighted">
-              {{ conversation.moduleId }}
-            </h3>
-            <ol class="mt-2 flex flex-col gap-2">
-              <li v-for="message in conversation.messages" :key="message.id" class="text-sm">
-                <p class="text-xs text-muted">
-                  {{ authors[message.author] }} · <time v-if="message.time" :datetime="message.time">{{ timeText(message.time) }}</time>
-                </p>
-                <p class="whitespace-pre-wrap text-default [overflow-wrap:anywhere]">
-                  {{ message.text }}
-                </p>
-              </li>
-            </ol>
-          </div>
-        </section>
+        <ConversationList :student-number="studentNumber" :conversations="data.conversations" />
 
         <section aria-labelledby="activity-heading" class="flex flex-col gap-3">
           <h2 id="activity-heading" class="text-base font-semibold text-highlighted">

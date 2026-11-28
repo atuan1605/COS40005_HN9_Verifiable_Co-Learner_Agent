@@ -13,12 +13,13 @@ export function createSupabaseStaffAccessLog({ url, secretKey }: { url: string, 
         student_id: access.studentId,
         course_id: access.courseId,
         opened: access.opened,
+        module_id: access.moduleId ?? null,
       })
       if (result.error) throw new Error(result.error.message)
     },
     async list(limit) {
       const rows = await supabase.from('staff_access_log')
-        .select('id, created_at, actor_email, actor_role, student_id, opened')
+        .select('id, created_at, actor_email, actor_role, student_id, course_id, opened, module_id')
         .order('created_at', { ascending: false })
         .order('id', { ascending: false })
         .limit(limit)
@@ -38,6 +39,8 @@ export function createSupabaseStaffAccessLog({ url, secretKey }: { url: string, 
         studentId: row.student_id,
         studentNumber: numbers.get(row.student_id) ?? null,
         opened: row.opened,
+        courseId: row.course_id,
+        moduleId: row.module_id,
       }))
     },
   }

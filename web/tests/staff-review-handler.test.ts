@@ -7,9 +7,9 @@ import { createMemoryStaffAccessLog } from '../server/storage/staff-access-log'
 import { createMemoryStaffReviewStore, type MemoryStaffReviewData, type StaffReviewStudent } from '../server/storage/staff-review-store'
 import { pythonCourse } from '../server/course'
 import { createMemoryEvidenceStore, learningParameters } from '../server/student-model'
-import { handleStaffReview } from '../server/staff-review'
+import { handleStaffConversation, handleStaffReview } from '../server/staff-review'
 import type { LearningPlan } from '../server/learning-plan'
-import type { ReviewEvent } from '../shared/staff-review'
+import type { ReviewEvent, ReviewMessage } from '../shared/staff-review'
 
 const adminEmails = 'owner@example.com'
 const lecturerEmails = 'lecturer@example.com, other@example.com'
@@ -40,6 +40,9 @@ function setup(extra: Partial<MemoryStaffReviewData> = {}) {
         ? { moduleId: module.id, mastery: 0.97, passedExercise: true, everMastered: true }
         : { moduleId: module.id, mastery: module.id === 'variables' ? 0.4 : 0, passedExercise: false, everMastered: false }),
     },
+    conversations: {
+      'an-id': [{ moduleId: 'loops', messages: [{ id: 'm1', sequence: 1, author: 'student', text: 'hi', exerciseId: 'sum', time: null }] }],
+    },
     ...extra,
     learningPlans: { 'an-id': plans },
     submissions: {
@@ -53,9 +56,6 @@ function setup(extra: Partial<MemoryStaffReviewData> = {}) {
         message: null,
         time: '2026-11-19T08:01:00Z',
       }],
-    },
-    conversations: {
-      'an-id': [{ moduleId: 'loops', messages: [{ id: 'm1', sequence: 1, author: 'student', text: 'hi', exerciseId: 'sum', time: null }] }],
     },
   })
   const accessLog = createMemoryStaffAccessLog({ 'an-id': 'SWB0001', 'binh-id': 'SWB0002' })
@@ -84,7 +84,7 @@ describe('staff review handler', () => {
     expect(review.courseId).toBe('intro_python')
     expect(review.activity.map(event => event.id)).toEqual([2, 1])
     expect(review.submissions.map(submission => submission.code)).toEqual(['print(1)'])
-    expect(review.conversations[0]!.messages.map(message => message.text)).toEqual(['hi'])
+    expect(review.conversations.map(conversation => conversation.moduleId)).toEqual(['loops'])
     expect(review.signals.map(signal => signal.kind)).toEqual(['large_paste_then_pass', 'pass_without_run'])
     expect(parts.accessLog.rows).toHaveLength(1)
   })
@@ -163,6 +163,125 @@ describe('staff review handler', () => {
 
     expect(second.signals).toEqual(first.signals)
     expect(await parts.store.activity('an-id', 'intro_python')).toEqual(events)
+  })
+})
+
+const said = (sequence: number, author: ReviewMessage['author'], text: string, time: string | null): ReviewMessage =>
+  ({ id: `m${sequence}-${text}`, sequence, author, text, exerciseId: 'sum', time })
+
+// Stored out of order, so the handlers have to do the ordering.
+const talked: MemoryStaffReviewData['conversations'] = {
+  'an-id': [
+    { moduleId: 'variables', messages: [said(1, 'student', 'what is a name', '2026-11-18T09:00:00Z')] },
+    { moduleId: 'loops', messages: [
+      said(3, 'deskmate', 'try a for loop', '2026-11-19T09:02:00Z'),
+      said(1, 'student', 'I am stuck', '2026-11-19T09:00:00Z'),
+      said(2, 'teacher', 'Where?', '2026-11-19T09:01:00Z'),
+      said(4, 'event', '3 of 3 tests passed', null),
+    ] },
+  ],
+}
+
+describe('the conversations a review lists', () => {
+  it('summarises each module\'s conversation, newest first, with no message bodies', async () => {
+    const review = await open('lecturer@example.com', 'SWB0001', setup({ conversations: talked })).result
+
+    expect(review.conversations).toEqual([
+      { moduleId: 'loops', moduleName: 'Loops', messageCount: 4, latestAt: '2026-11-19T09:02:00Z' },
+      { moduleId: 'variables', moduleName: 'Variables, Data Types, and Operators',messageCount: 1, latestAt: '2026-11-18T09:00:00Z' },
+    ])
+    expect(JSON.stringify(review)).not.toContain('I am stuck')
+  })
+})
+
+function openConversation(email: string | null, studentNumber: string, moduleId: string, parts = setup({ conversations: talked })) {
+  return {
+    parts,
+    result: handleStaffConversation({
+      email, adminEmails, lecturerEmails, studentNumber, moduleId, store: parts.store, accessLog: parts.accessLog, courses: createMemoryCourseStore(),
+    }),
+  }
+}
+
+describe('one conversation of a student', () => {
+  it('gives the owning lecturer every message, the student\'s own included, oldest first', async () => {
+    const conversation = await openConversation('lecturer@example.com', 'SWB0001', 'loops').result
+
+    expect(conversation.student.displayName).toBe('An')
+    expect(conversation).toMatchObject({ moduleId: 'loops', moduleName: 'Loops' })
+    expect(conversation.messages.map(message => [message.author, message.text])).toEqual([
+      ['student', 'I am stuck'],
+      ['teacher', 'Where?'],
+      ['deskmate', 'try a for loop'],
+      ['event', '3 of 3 tests passed'],
+    ])
+  })
+
+  it.each([
+    { email: 'lecturer@example.com', actorRole: 'lecturer' },
+    { email: 'owner@example.com', actorRole: 'administrator' },
+  ])('logs the opening by the $actorRole with the module', async ({ email, actorRole }) => {
+    const { result, parts } = openConversation(email, 'SWB0001', 'loops')
+    await result
+
+    expect(parts.accessLog.rows).toMatchObject([
+      { actorEmail: email, actorRole, studentId: 'an-id', courseId: 'intro_python', opened: 'student_conversation', moduleId: 'loops' },
+    ])
+  })
+
+  it('lets an administrator open any student, with no messages where there are none', async () => {
+    const conversation = await openConversation('owner@example.com', 'SWB0002', 'loops', setup({ conversations: {} })).result
+
+    expect(conversation.messages).toEqual([])
+  })
+
+  it('writes the log before it reads a message', async () => {
+    const parts = setup({ conversations: talked })
+    const seen: number[] = []
+    const store = { ...parts.store, conversations: async (studentId: string, courseId: string) => {
+      seen.push(parts.accessLog.rows.length)
+      return parts.store.conversations(studentId, courseId)
+    } }
+
+    await openConversation('lecturer@example.com', 'SWB0001', 'loops', { ...parts, store }).result
+
+    expect(seen).toEqual([1])
+  })
+
+  it('hands over nothing when the log cannot be written', async () => {
+    const parts = setup({ conversations: talked })
+    const accessLog = { ...parts.accessLog, record: async () => { throw new Error('log down') } }
+
+    await expect(openConversation('lecturer@example.com', 'SWB0001', 'loops', { ...parts, accessLog }).result).rejects.toThrow('log down')
+  })
+
+  it.each([
+    { email: null, studentNumber: 'SWB0001', statusCode: 401 },
+    { email: 'an@example.com', studentNumber: 'SWB0001', statusCode: 403 },
+    { email: 'other@example.com', studentNumber: 'SWB0001', statusCode: 403 },
+    // Refused like a student who is not theirs, so a number cannot be probed.
+    { email: 'lecturer@example.com', studentNumber: 'SWB9999', statusCode: 403 },
+    { email: 'owner@example.com', studentNumber: 'SWB9999', statusCode: 404 },
+  ])('refuses $email for $studentNumber with $statusCode and logs nothing', async ({ email, studentNumber, statusCode }) => {
+    const { result, parts } = openConversation(email, studentNumber, 'loops')
+
+    await expect(result).rejects.toMatchObject({ statusCode })
+    expect(parts.accessLog.rows).toEqual([])
+  })
+
+  it('answers 404 for a module that does not exist, and logs nothing', async () => {
+    const { result, parts } = openConversation('lecturer@example.com', 'SWB0001', 'no_such_module')
+
+    await expect(result).rejects.toMatchObject({ statusCode: 404 })
+    expect(parts.accessLog.rows).toEqual([])
+  })
+
+  it('still opens a conversation in a module the course no longer lists', async () => {
+    const parts = setup({ conversations: { 'an-id': [{ moduleId: 'dropped', messages: [said(1, 'student', 'old talk', null)] }] } })
+
+    const conversation = await openConversation('lecturer@example.com', 'SWB0001', 'dropped', parts).result
+
+    expect(conversation).toMatchObject({ moduleName: 'dropped', messages: [{ text: 'old talk' }] })
   })
 })
 
@@ -294,6 +413,7 @@ describe('reading the staff access log', () => {
       env: { provider: 'fake', apiKey: '', baseUrl: '', modelName: '' },
       store: createMemoryModelSettingsStore(),
       accessLog,
+      courses: createMemoryCourseStore(),
       body: { event: 'staffAccessLog' },
     })
   }
@@ -308,6 +428,19 @@ describe('reading the staff access log', () => {
     expect(answer.staffAccess.map(entry => [entry.actorEmail, entry.studentNumber, entry.opened])).toEqual([
       ['owner@example.com', 'SWB0001', 'student_review'],
       ['lecturer@example.com', 'SWB0001', 'student_review'],
+    ])
+  })
+
+  it('names the module of a conversation that was opened', async () => {
+    const parts = setup({ conversations: talked })
+    await open('lecturer@example.com', 'SWB0001', parts).result
+    await openConversation('lecturer@example.com', 'SWB0001', 'loops', parts).result
+
+    const answer = await read('owner@example.com', parts.accessLog)
+
+    expect(answer.staffAccess.map(entry => [entry.opened, entry.moduleName])).toEqual([
+      ['student_conversation', 'Loops'],
+      ['student_review', null],
     ])
   })
 

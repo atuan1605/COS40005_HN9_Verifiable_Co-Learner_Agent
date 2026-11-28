@@ -1,9 +1,9 @@
 import type { LearningPlan } from '../learning-plan'
 import type { StoredMastery } from '../student-model'
 import type {
-  ReviewConversation,
   ReviewedStudent,
   ReviewEvent,
+  ReviewMessage,
   ReviewSubmission,
 } from '../../shared/staff-review'
 
@@ -15,6 +15,11 @@ export interface StaffReviewStudent extends ReviewedStudent {
   id: string
 }
 
+export interface ReviewConversation {
+  moduleId: string
+  messages: ReviewMessage[]
+}
+
 export interface StaffReviewStore {
   studentByNumber: (studentNumber: string) => Promise<StaffReviewStudent | null>
   // The course this lecturer owns that the student is enrolled in, or null.
@@ -22,7 +27,10 @@ export interface StaffReviewStore {
   // The student's activity in the course, oldest first.
   activity: (studentId: string, courseId: string) => Promise<ReviewEvent[]>
   submissions: (studentId: string, courseId: string) => Promise<ReviewSubmission[]>
-  conversations: (studentId: string, courseId: string) => Promise<ReviewConversation[]>
+  // Every message of the student's conversations in the course, or of one module's alone.
+  conversations: (studentId: string, courseId: string, moduleId?: string) => Promise<ReviewConversation[]>
+  // Whether the student has a conversation in the module. It reads no message.
+  hasConversation: (studentId: string, courseId: string, moduleId: string) => Promise<boolean>
   // Every revision of every plan, oldest first.
   learningPlans: (studentId: string, courseId: string) => Promise<LearningPlan[]>
   // The student's stored mastery rows in the course (ADR 0008). Read only for the owning lecturer (ADR 0013).
@@ -68,8 +76,11 @@ export function createMemoryStaffReviewStore(data: MemoryStaffReviewData): Staff
     async unlocks(studentId) {
       return [...(data.unlocks?.[studentId] ?? [])]
     },
-    async conversations(studentId) {
-      return (data.conversations?.[studentId] ?? []).map(conversation => ({
+    async hasConversation(studentId, _courseId, moduleId) {
+      return (data.conversations?.[studentId] ?? []).some(conversation => conversation.moduleId === moduleId)
+    },
+    async conversations(studentId, _courseId, moduleId) {
+      return (data.conversations?.[studentId] ?? []).filter(conversation => moduleId === undefined || conversation.moduleId === moduleId).map(conversation => ({
         moduleId: conversation.moduleId,
         messages: conversation.messages.map(message => ({ ...message })),
       }))
