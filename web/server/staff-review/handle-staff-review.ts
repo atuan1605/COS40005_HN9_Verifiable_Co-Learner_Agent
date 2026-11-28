@@ -109,12 +109,16 @@ async function reviewMastery(request: StaffReviewRequest, studentId: string, cou
   }))
 }
 
-// The plans by module, every revision of each, oldest first, with each step in words.
+// The plans by module, named, every revision of each, oldest first, with each step in words.
 function reviewPlans(revisions: readonly LearningPlan[], course: Course): ReviewPlan[] {
   const byModule = new Map<string, ReviewPlan>()
   for (const plan of [...revisions].sort((left, right) => left.revision - right.revision)) {
     const module = course.studyModules.find(candidate => candidate.id === plan.moduleId)
-    const entry = byModule.get(plan.moduleId) ?? { moduleId: plan.moduleId, revisions: [] }
+    const entry = byModule.get(plan.moduleId) ?? {
+      moduleId: plan.moduleId,
+      moduleName: course.modules.find(candidate => candidate.id === plan.moduleId)?.name ?? plan.moduleId,
+      revisions: [],
+    }
     entry.revisions.push({
       revision: plan.revision,
       steps: plan.steps.map(step => ({
