@@ -18,7 +18,7 @@ function set(key: keyof StudentFilterValues, event: Event) {
 </script>
 
 <template>
-  <div class="grid items-end gap-3 rounded-xl border border-default bg-default p-4 shadow-xs sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]" role="search" aria-label="Filter students">
+  <div class="grid grid-cols-[minmax(0,1fr)] items-end gap-3 rounded-xl border border-default bg-default p-4 shadow-xs sm:grid-cols-[repeat(2,minmax(0,1fr))] lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]" role="search" aria-label="Filter students">
     <label class="flex flex-col gap-1.5 text-xs font-medium leading-4 text-default">
       <span>Search students</span>
       <input
@@ -27,7 +27,7 @@ function set(key: keyof StudentFilterValues, event: Event) {
         type="search"
         autocomplete="off"
         placeholder="Name or student number"
-        class="min-h-11 rounded-sm border border-default bg-default px-3 text-base/6 font-normal text-default md:min-h-0 md:py-[9px] md:text-sm/5"
+        class="min-h-11 w-full min-w-0 rounded-sm border border-default bg-default px-3 text-base/6 font-normal text-default md:min-h-0 md:py-[9px] md:text-sm/5"
       >
     </label>
     <label class="flex flex-col gap-1.5 text-xs font-medium leading-4 text-default">
@@ -35,7 +35,7 @@ function set(key: keyof StudentFilterValues, event: Event) {
       <select
         :value="filters.campus"
         aria-label="Campus"
-        class="min-h-11 rounded-sm border border-default bg-default px-3 text-base/6 font-normal text-default md:min-h-0 md:py-[9px] md:text-sm/5"
+        class="min-h-11 w-full min-w-0 rounded-sm border border-default bg-default px-3 text-base/6 font-normal text-default md:min-h-0 md:py-[9px] md:text-sm/5"
         @change="set('campus', $event)"
       >
         <option value="">All campuses</option>
@@ -47,7 +47,7 @@ function set(key: keyof StudentFilterValues, event: Event) {
       <select
         :value="filters.group"
         aria-label="Course progress"
-        class="min-h-11 rounded-sm border border-default bg-default px-3 text-base/6 font-normal text-default md:min-h-0 md:py-[9px] md:text-sm/5"
+        class="min-h-11 w-full min-w-0 rounded-sm border border-default bg-default px-3 text-base/6 font-normal text-default md:min-h-0 md:py-[9px] md:text-sm/5"
         @change="set('group', $event)"
       >
         <option value="">Any progress</option>
@@ -59,7 +59,7 @@ function set(key: keyof StudentFilterValues, event: Event) {
       <select
         :value="filters.moduleId"
         aria-label="Current module"
-        class="min-h-11 rounded-sm border border-default bg-default px-3 text-base/6 font-normal text-default md:min-h-0 md:py-[9px] md:text-sm/5"
+        class="min-h-11 w-full min-w-0 rounded-sm border border-default bg-default px-3 text-base/6 font-normal text-default md:min-h-0 md:py-[9px] md:text-sm/5"
         @change="set('moduleId', $event)"
       >
         <option value="">Any module</option>

@@ -36,7 +36,7 @@ flowchart LR
     filtersC["<b>components/lecturer/<br/>StudentFilters.vue</b>"]:::comp
     insightsPanel["<b>components/lecturer/<br/>CourseInsightsPanel.vue</b>"]:::comp
     coursePathC["<b>components/lecturer/<br/>CoursePath.vue</b>"]:::comp
-    studentChips["<b>components/lecturer/<br/>StudentChips.vue</b>"]:::comp
+    pagePicker["<b>components/lecturer/<br/>PagePicker.vue</b>"]:::comp
     progressPie["<b>components/lecturer/<br/>ProgressGroupsPie.vue</b>"]:::comp
     portrait["<b>components/lecturer/<br/>StudentPortrait.vue</b>"]:::comp
     settings["<b>pages/admin/settings.vue</b><br/>/admin/settings"]:::comp
@@ -127,10 +127,11 @@ flowchart LR
   filtersC -->|"noFilters, isFiltering"| filtersH
   filtersC -->|"progressGroupRanges"| overviewH
   insightsPanel -->|"classSummary"| overviewH
-  coursePathC -->|"StudentChips"| studentChips
+  coursePathC -->|"PagePicker"| pagePicker
+  coursePathC -->|"StudentPortrait"| portrait
+  coursePathC ==>|"link by student number"| review
+  pagePicker -->|"pageNumbers"| insightsH
   coursePathC -->|"coursePath"| insightsH
-  studentChips -->|"StudentPortrait"| portrait
-  studentChips ==>|"link by student number"| review
   classOverview -->|"ProgressGroupsPie"| progressPie
   progressPie -->|"PieChart"| pieChart
   progressPie -->|"progressGroups"| overviewH
@@ -175,7 +176,7 @@ flowchart LR
 | `components/lecturer/ClassOverview.vue`, `PieChart.vue` | The top of a course's Overview: a card of totals (enrolled, always of the whole class; average Course progress rounded down and finished, of the students shown), and two pie cards, students by Course progress group and their modules by state. Each pie's legend carries the counts and shares as text. The progress pie is not narrowed by the Course progress filter: it highlights the chosen group among the students the other filters leave, here and on Insights. |
 | `components/lecturer/StudentFilters.vue` | The filter card shared by the Overview and Insights tabs, each with its own values: search by name or student number, campus, Course progress group, current module and Clear filters. It narrows what the page already has, with no request. |
 | `components/lecturer/StudentRoster.vue`, `ModuleRing.vue` | The enrolled students card of a course: the table of the students the filters leave, with sorting and review links. Each row has the default portrait (the lecturer response carries no profile picture) and a ring of the student's modules, one equal segment per module, coloured by state. Below `md` each row stacks. |
-| `components/lecturer/CourseInsightsPanel.vue`, `CoursePath.vue`, `StudentChips.vue` | The Insights pane. `StudentFilters` narrows the students on the page, and everything below is fed those students. Course path: every listed module in course order with a bar and the students now working on it (the first module open to them), how many have mastered it, and at the end those with no module open; each student is a chip with portrait and name linking to `review/[studentNumber].vue`, the rest of a long row behind a button. Beside it, a Course progress pie with the average, and the five students furthest behind. |
+| `components/lecturer/CourseInsightsPanel.vue`, `CoursePath.vue`, `PagePicker.vue` | The Insights pane. `StudentFilters` narrows the students on the page, and everything below is fed those students. Course path: a strip with a button and bar for each listed module, and one for no module open, showing how many students are working there (the first module open to them). The chosen one, the busiest until the lecturer picks, lists its students 10 a page (`PagePicker`) with how many have mastered it; each links to `review/[studentNumber].vue`. Beside it, a Course progress pie with the average, and the five students furthest behind. |
 | `components/lecturer/ProgressGroupsPie.vue`, `StudentPortrait.vue` | Shared by Overview and Insights: students by Course progress group as a pie, and the default student portrait. |
 | `app.vue`, `app.config.ts` | `UApp` with `NuxtPage` and the light colour mode; colours come from the tokens in `docs/agents/palette.md`. |
 
@@ -187,7 +188,7 @@ flowchart LR
 - `home.vue`: `shared/student-id`.
 - `review/[studentNumber].vue`: `CourseProgressSection`, `ConversationList`, `LearningPlanCard`, `LatestActivityTable`, `shared/staff-review` (type), `staff/landing`, `staff/time-text`. `CourseProgressSection` imports `shared/staff-review` (type); `LearningPlanCard` imports `shared/staff-review` (types) and `staff/time-text`; `LatestActivityTable` imports `shared/staff-review` (type), `review/activity-pages` and `staff/time-text`. `review/conversation.vue`: `ChatMarkdown`, `workspace/message-style`, `workspace/conversation-dates`, `shared/turn` (`agentNames`), `shared/staff-review` (type).
 - `profile.vue`: `StudentResponse` (type) from `server/student`.
-- `admin/index.vue`: `AdminHeader`, `VerdictDrawer`, `admin/decisions` (types). `admin/settings.vue` and `admin/students.vue`: `AdminHeader`, `admin/decisions` (type), `admin/message`. `admin/students.vue` also imports `shared/student-number`. `admin/security.vue`: `AdminHeader`, `BusySpinner`, `CyberCaseRow`, `CyberRunSummary`, `admin/message`, `admin/decisions` (type) and `#shared/injection-suite` (`securitySummary` and the view, run-event and record types). `CyberCaseRow` imports `injectionCategoryLabels`; it and `CyberRunSummary` are presentational and serve both the live run and the saved record views. `sign-in.vue`, `lecturer.vue` and `AdminHeader.vue` also import `staff/landing`. `lecturer.vue` imports `CourseInsightsPanel`, `CourseEditor` and `CoursePreviewPanel`; `CourseInsightsPanel` imports `StudentFilters`, `CoursePath`, `ProgressGroupsPie`, `StudentPortrait`, `lecturer/course-insights`, `lecturer/course-overview` and `lecturer/student-filters`; `StudentFilters` imports `shared/campus`, `lecturer/course-overview` and `lecturer/student-filters`; `CoursePath` imports `StudentChips` and `lecturer/course-insights`; `StudentChips` imports `StudentPortrait`; `CourseEditor` imports `MermaidDiagram`.
+- `admin/index.vue`: `AdminHeader`, `VerdictDrawer`, `admin/decisions` (types). `admin/settings.vue` and `admin/students.vue`: `AdminHeader`, `admin/decisions` (type), `admin/message`. `admin/students.vue` also imports `shared/student-number`. `admin/security.vue`: `AdminHeader`, `BusySpinner`, `CyberCaseRow`, `CyberRunSummary`, `admin/message`, `admin/decisions` (type) and `#shared/injection-suite` (`securitySummary` and the view, run-event and record types). `CyberCaseRow` imports `injectionCategoryLabels`; it and `CyberRunSummary` are presentational and serve both the live run and the saved record views. `sign-in.vue`, `lecturer.vue` and `AdminHeader.vue` also import `staff/landing`. `lecturer.vue` imports `CourseInsightsPanel`, `CourseEditor` and `CoursePreviewPanel`; `CourseInsightsPanel` imports `StudentFilters`, `CoursePath`, `ProgressGroupsPie`, `StudentPortrait`, `lecturer/course-insights`, `lecturer/course-overview` and `lecturer/student-filters`; `StudentFilters` imports `shared/campus`, `lecturer/course-overview` and `lecturer/student-filters`; `CoursePath` imports `PagePicker`, `StudentPortrait` and `lecturer/course-insights`, which `PagePicker` imports too; `CourseEditor` imports `MermaidDiagram`.
 - `AboutSampleTurn`, `AboutShieldDiagram` and `AboutLearningRoadmap` are used in templates without an import (Nuxt component auto-registration from `components/about/`). `RecordingNotice` is the same, from `components/`, on `home.vue` and `profile.vue`.
 - Middleware is attached by name in `definePageMeta`: `index.vue` uses `['signed-in', 'staff-landing', 'workspace-layout']`; `profile.vue` uses `['signed-in', 'staff-landing']`; the five admin pages and `lecturer.vue` use `'signed-in'`. `home.vue`, `sign-in.vue` and `sign-up.vue` set none.
 - Nothing imports the pages; Nuxt routes them from the file names (`review/conversation.vue` sets its own path). No test imports them (`lecturer/course-insights.ts` has `tests/course-insights.test.ts`, `review/activity-pages.ts` has `tests/activity-pages.test.ts`); the Playwright specs in `web/e2e/` drive them in a browser.
