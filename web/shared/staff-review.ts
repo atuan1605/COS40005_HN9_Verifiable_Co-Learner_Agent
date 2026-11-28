@@ -76,6 +76,8 @@ export interface ReviewPlanRevision {
 
 export interface ReviewPlan {
   moduleId: string
+  // The module's name; its id when the course no longer has it.
+  moduleName: string
   // Oldest first; the last is the plan in force.
   revisions: ReviewPlanRevision[]
 }

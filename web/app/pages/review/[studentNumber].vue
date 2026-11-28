@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { StaffReview } from '#shared/staff-review'
+import LearningPlanCard from '~/components/review/LearningPlanCard.vue'
 import { isProductOwner } from '~/staff/landing'
+import { timeText } from '~/staff/time-text'
 
 definePageMeta({ middleware: 'signed-in' })
 
@@ -26,11 +28,6 @@ onMounted(async () => {
   administrator.value = await isProductOwner(role)
 })
 const backTo = computed(() => administrator.value ? '/admin/students' : '/lecturer')
-
-const dateTime = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })
-function timeText(value: string | null): string {
-  return value ? dateTime.format(new Date(value)) : 'Before times were kept'
-}
 
 const eventLabels: Record<string, string> = {
   signed_in: 'Signed in',
@@ -67,7 +64,6 @@ function duration(seconds: number): string {
   const minutes = Math.floor(seconds / 60)
   return minutes === 0 ? `${seconds}s` : `${minutes}m ${seconds % 60}s`
 }
-const planState = (revision: { agreedAt: string | null }) => revision.agreedAt ? 'Agreed' : 'Proposed'
 
 const authors: Record<string, string> = { student: 'Student', teacher: 'Teacher', deskmate: 'Mai', event: 'System' }
 const outcomes: Record<string, string> = { passed: 'Passed', failed: 'Failed', refused: 'Not checked' }
@@ -203,26 +199,7 @@ const pagedSignals = computed(() => (data.value?.signals ?? []).slice((signalPag
           <p v-if="!data.plans.length" class="text-sm text-muted">
             No plan yet.
           </p>
-          <div v-for="plan in data.plans" :key="plan.moduleId" class="rounded-lg border border-default bg-default p-3 shadow-xs">
-            <h3 class="text-sm font-medium text-highlighted">
-              {{ plan.moduleId }}
-            </h3>
-            <ol class="mt-2 flex flex-col gap-3">
-              <li v-for="revision in plan.revisions" :key="revision.revision" class="text-sm">
-                <p class="flex flex-wrap items-baseline gap-x-3">
-                  <strong class="text-highlighted">Revision {{ revision.revision }}</strong>
-                  <span class="text-muted">{{ planState(revision) }}</span>
-                  <span v-if="revision.trigger" class="text-xs text-muted">Because: {{ revision.trigger }}</span>
-                  <time :datetime="revision.time" class="ml-auto text-xs text-muted">{{ timeText(revision.time) }}</time>
-                </p>
-                <ol class="mt-1 list-decimal pl-5 text-default">
-                  <li v-for="(step, index) in revision.steps" :key="index" class="[overflow-wrap:anywhere]">
-                    {{ step.title }}<span v-if="index === revision.currentStep" class="text-xs text-muted"> (current)</span>
-                  </li>
-                </ol>
-              </li>
-            </ol>
-          </div>
+          <LearningPlanCard v-for="plan in data.plans" :key="plan.moduleId" :plan="plan" />
         </section>
 
         <section aria-labelledby="pattern-heading" class="flex flex-col gap-3" data-testid="review-pattern">
