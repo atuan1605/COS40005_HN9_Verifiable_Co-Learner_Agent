@@ -33,7 +33,7 @@ flowchart LR
   cdn["<b>jsDelivr CDN</b>"]:::ext
 
   pages -->|"imports 5 panels"| ws
-  pages -->|"drafts/store, workspace/layout,<br/>sign-in/intro, activity/record,<br/>staff/landing, staff/time-text,<br/>review/activity-pages,<br/>lecturer/course-insights,<br/>workspace/message-style,<br/>workspace/conversation-dates"| helpers
+  pages -->|"drafts/store, workspace/layout,<br/>sign-in/intro, activity/record,<br/>staff/landing, staff/time-text,<br/>review/activity-pages,<br/>lecturer/course-insights,<br/>lecturer/course-overview,<br/>lecturer/student-filters,<br/>workspace/message-style,<br/>workspace/conversation-dates"| helpers
   pages -->|"studentIdFromAuth,<br/>sessionStudentId"| shared
   pages ==>|"auto-registered"| home
   pages ==>|"/turn, /api/student, /api/admin,<br/>/api/admin/security-suite,<br/>/api/admin/security-run, /api/lecturer,<br/>/course-outline"| server

@@ -29,10 +29,16 @@ flowchart LR
     conversationList["<b>components/review/<br/>ConversationList.vue</b>"]:::comp
     activityTableC["<b>components/review/<br/>LatestActivityTable.vue</b>"]:::comp
     planCard["<b>components/review/<br/>LearningPlanCard.vue</b>"]:::comp
+    classOverview["<b>components/lecturer/<br/>ClassOverview.vue</b>"]:::comp
+    pieChart["<b>components/lecturer/<br/>PieChart.vue</b>"]:::comp
+    roster["<b>components/lecturer/<br/>StudentRoster.vue</b>"]:::comp
+    moduleRing["<b>components/lecturer/<br/>ModuleRing.vue</b>"]:::comp
+    filtersC["<b>components/lecturer/<br/>StudentFilters.vue</b>"]:::comp
     insightsPanel["<b>components/lecturer/<br/>CourseInsightsPanel.vue</b>"]:::comp
-    statusChart["<b>components/lecturer/<br/>ModuleStatusChart.vue</b>"]:::comp
-    histogramC["<b>components/lecturer/<br/>CourseProgressHistogram.vue</b>"]:::comp
-    studentList["<b>components/lecturer/<br/>StudentListPanel.vue</b>"]:::comp
+    coursePathC["<b>components/lecturer/<br/>CoursePath.vue</b>"]:::comp
+    studentChips["<b>components/lecturer/<br/>StudentChips.vue</b>"]:::comp
+    progressPie["<b>components/lecturer/<br/>ProgressGroupsPie.vue</b>"]:::comp
+    portrait["<b>components/lecturer/<br/>StudentPortrait.vue</b>"]:::comp
     settings["<b>pages/admin/settings.vue</b><br/>/admin/settings"]:::comp
     security["<b>pages/admin/security.vue</b><br/>/admin/security"]:::comp
     lecturer["<b>pages/lecturer.vue</b><br/>/lecturer"]:::comp
@@ -45,6 +51,8 @@ flowchart LR
   timeTextH["<b>client helpers</b><br/>staff/time-text"]:::near
   pagingH["<b>client helpers</b><br/>review/activity-pages"]:::near
   insightsH["<b>client helpers</b><br/>lecturer/course-insights"]:::near
+  filtersH["<b>client helpers</b><br/>lecturer/student-filters"]:::near
+  overviewH["<b>client helpers</b><br/>lecturer/course-overview"]:::near
   aboutParts["<b>about components</b><br/>SampleTurn, ShieldDiagram,<br/>LearningRoadmap"]:::near
   mw["<b>middleware and plugins</b><br/>signed-in, staff-landing,<br/>workspace-layout, $supabase plugin"]:::near
   server["<b>Turn and admin server</b>"]:::near
@@ -96,17 +104,37 @@ flowchart LR
   conversationPage ==>|"middleware: signed-in"| mw
   conversationPage -->|"ChatMarkdown"| panels
   conversationPage -->|"workspace/message-style,<br/>workspace/conversation-dates"| helpers
-  lecturer ==>|"link by student number"| review
   students ==>|"link by student number"| review
   lecturer -->|"CourseInsightsPanel"| insightsPanel
-  insightsPanel -->|"ModuleStatusChart"| statusChart
-  insightsPanel -->|"CourseProgressHistogram"| histogramC
-  statusChart -->|"StudentListPanel"| studentList
-  histogramC -->|"StudentListPanel"| studentList
-  studentList ==>|"link by student number"| review
-  insightsPanel -->|"studentsAtCampus,<br/>studentCountText"| insightsH
-  statusChart -->|"moduleStatus,<br/>studentCountText"| insightsH
-  histogramC -->|"progressBands,<br/>studentCountText"| insightsH
+  lecturer -->|"ClassOverview"| classOverview
+  lecturer -->|"StudentRoster"| roster
+  classOverview -->|"PieChart"| pieChart
+  roster -->|"ModuleRing"| moduleRing
+  roster ==>|"link by student number"| review
+  classOverview -->|"classSummary,<br/>moduleStateTotals"| overviewH
+  pieChart -->|"ringSegment"| overviewH
+  moduleRing -->|"moduleStateOf, ringSegment"| overviewH
+  insightsPanel -->|"CoursePath"| coursePathC
+  insightsPanel -->|"ProgressGroupsPie"| progressPie
+  insightsPanel -->|"StudentPortrait"| portrait
+  insightsPanel ==>|"link by student number"| review
+  insightsPanel -->|"furthestBehind,<br/>studentCountText"| insightsH
+  insightsPanel -->|"filterStudents"| filtersH
+  insightsPanel -->|"StudentFilters"| filtersC
+  lecturer -->|"StudentFilters"| filtersC
+  lecturer -->|"filterStudents"| filtersH
+  lecturer -->|"studentCountText"| insightsH
+  filtersC -->|"noFilters, isFiltering"| filtersH
+  filtersC -->|"progressGroupRanges"| overviewH
+  insightsPanel -->|"classSummary"| overviewH
+  coursePathC -->|"StudentChips"| studentChips
+  coursePathC -->|"coursePath"| insightsH
+  studentChips -->|"StudentPortrait"| portrait
+  studentChips ==>|"link by student number"| review
+  classOverview -->|"ProgressGroupsPie"| progressPie
+  progressPie -->|"PieChart"| pieChart
+  progressPie -->|"progressGroups"| overviewH
+  roster -->|"StudentPortrait"| portrait
   lecturer ==>|"middleware: signed-in"| mw
   lecturer ==>|"GET and POST /api/lecturer and /api/lecturer/spec"| server
   lecturer -->|"isProductOwner"| adminParts
@@ -143,8 +171,12 @@ flowchart LR
 | `components/admin/AdminHeader.vue` | Header shared by the administrator pages: the Decisions/Students/Access log/Cyber Security/Settings nav (`aria-current` on the current page), a Lecturer page link when `isLecturer` succeeds (the switch for someone who also lectures), and Sign out. It has no link to a student page. |
 | `components/admin/VerdictDrawer.vue` | Native modal `<dialog>` drawer: the rule checks in order with ✓/✗ and plain-English reasons, the deciding check highlighted, proposed and ruled move, masteries, unlocked modules, threshold, VerifyShield state, the code version and the course history entry (each `not recorded` when the decision was stored before that was kept). Escape, the close button or a click on the backdrop close it; full screen on a phone. |
 | `admin/decisions.ts`, `staff/landing.ts` | The admin payload types (decisions, model settings, the student directory), the reason-code wording and `drawerChecks` (shield off: no checks and a note; older record: the deciding rule only and a note); `isProductOwner` and `isLecturer` through the cheap role checks (`POST /api/admin` with `{event: 'role'}`, `GET /api/lecturer`), and `staffLanding`, which runs both checks and sends an administrator to `/admin`, a lecturer to `/lecturer` and a student nowhere. Agent names (`Teacher`, `Mai`) come from `agentNames` in `shared/turn.ts`, shared with the `@` menu. |
-| `pages/lecturer.vue` | Shows owned courses, enrollment counts, course history and the enrolled students of each course: name, student number, Course progress ("n/total · %" with a bar, ADR 0013), email and enrollment date, searchable by name or student number and sortable by any of those columns client-side. Each student has a link to the read-only staff review page; this page itself shows no code, conversation or activity. Lecturers can set the mastery threshold. The Insights pane (`components/lecturer/CourseInsightsPanel.vue`) shows **Course insights** per owned course, with one campus select (default All campuses) that filters what the page already has; a course with no students, or none at that campus, says so. The Editor pane (`components/lecturer/CourseEditor.vue`) edits the course draft: add, reorder and remove parts and modules, move a module to a part, edit materials blocks with a live Mermaid preview, the quiz (choices, correct choice, explanation), exercises (statement, starter code, reference solution), the hint ladder and misconception responses. It saves the draft, discards it, imports a course spec JSON into it, exports the draft and the published spec, and Publish saves what is on screen and then publishes it. Validation errors from the server name the module and field. The Preview pane (`components/lecturer/CoursePreviewPanel.vue`) shows the draft as a student would see it: one module at a time, its materials blocks, its quiz with the correct choice named, the hint ladder and the misconception responses, each teacher-only part marked, beside a practice panel that runs the module's exercises and Submits against the draft's own tests in the browser. It loads `GET /api/lecturer/spec?preview=1`, so it never calls the turn endpoint, asks an agent or records anything, and reference solutions never reach it. Both are imported explicitly, since Nuxt's auto-import would name them `Lecturer…`. An administrator who also lectures gets the Administrator page switch; staff sign out from this header. Sign-in routes authorized lecturers here, and a student row links to `review/[studentNumber].vue`. |
-| `components/lecturer/CourseInsightsPanel.vue`, `ModuleStatusChart.vue`, `CourseProgressHistogram.vue`, `StudentListPanel.vue` | The Insights pane and its two charts, both fed the same campus-filtered students. Module status: per module, a hand-written SVG stacked bar of the students shown who have it mastered, open or closed. Hover or focus shows a tooltip with the counts; a segment is a keyboard-reachable button that lists its students, each linking to `review/[studentNumber].vue`; the same counts are also a table. Course progress distribution: a hand-written SVG histogram of those students in five percentage bands; hover or focus on an occupied band lists its students, who link to their reviews (the list stays until closed or another band is shown, and Enter moves focus into it); the bands and counts are also a table. Both charts list students with `StudentListPanel`: a title, a Close button and a review link per student. |
+| `pages/lecturer.vue` | For each owned course the Overview pane stacks cards: `ClassOverview` (totals and pies), `StudentRoster` (under the tab's `StudentFilters`; the enrolled students: name, student number, Course progress as "n/total · %" with a module ring, ADR 0013, email and enrollment date, sortable client-side, each with a link to the read-only staff review page), then the mastery threshold, course spec export and import, and course history. This page itself shows no code, conversation or activity. Lecturers can set the mastery threshold. The Insights pane (`components/lecturer/CourseInsightsPanel.vue`) shows **Course insights** per owned course, with filters (search, campus, Course progress group, current module) that narrow what the page already has; a course with no students, or none matching, says so. The Editor pane (`components/lecturer/CourseEditor.vue`) edits the course draft: add, reorder and remove parts and modules, move a module to a part, edit materials blocks with a live Mermaid preview, the quiz (choices, correct choice, explanation), exercises (statement, starter code, reference solution), the hint ladder and misconception responses. It saves the draft, discards it, imports a course spec JSON into it, exports the draft and the published spec, and Publish saves what is on screen and then publishes it. Validation errors from the server name the module and field. The Preview pane (`components/lecturer/CoursePreviewPanel.vue`) shows the draft as a student would see it: one module at a time, its materials blocks, its quiz with the correct choice named, the hint ladder and the misconception responses, each teacher-only part marked, beside a practice panel that runs the module's exercises and Submits against the draft's own tests in the browser. It loads `GET /api/lecturer/spec?preview=1`, so it never calls the turn endpoint, asks an agent or records anything, and reference solutions never reach it. Both are imported explicitly, since Nuxt's auto-import would name them `Lecturer…`. An administrator who also lectures gets the Administrator page switch; staff sign out from this header. Sign-in routes authorized lecturers here, and a student row in `StudentRoster` links to `review/[studentNumber].vue`. |
+| `components/lecturer/ClassOverview.vue`, `PieChart.vue` | The top of a course's Overview: a card of totals (enrolled, always of the whole class; average Course progress rounded down and finished, of the students shown), and two pie cards, students by Course progress group and their modules by state. Each pie's legend carries the counts and shares as text. The progress pie is not narrowed by the Course progress filter: it highlights the chosen group among the students the other filters leave, here and on Insights. |
+| `components/lecturer/StudentFilters.vue` | The filter card shared by the Overview and Insights tabs, each with its own values: search by name or student number, campus, Course progress group, current module and Clear filters. It narrows what the page already has, with no request. |
+| `components/lecturer/StudentRoster.vue`, `ModuleRing.vue` | The enrolled students card of a course: the table of the students the filters leave, with sorting and review links. Each row has the default portrait (the lecturer response carries no profile picture) and a ring of the student's modules, one equal segment per module, coloured by state. Below `md` each row stacks. |
+| `components/lecturer/CourseInsightsPanel.vue`, `CoursePath.vue`, `StudentChips.vue` | The Insights pane. `StudentFilters` narrows the students on the page, and everything below is fed those students. Course path: every listed module in course order with a bar and the students now working on it (the first module open to them), how many have mastered it, and at the end those with no module open; each student is a chip with portrait and name linking to `review/[studentNumber].vue`, the rest of a long row behind a button. Beside it, a Course progress pie with the average, and the five students furthest behind. |
+| `components/lecturer/ProgressGroupsPie.vue`, `StudentPortrait.vue` | Shared by Overview and Insights: students by Course progress group as a pie, and the default student portrait. |
 | `app.vue`, `app.config.ts` | `UApp` with `NuxtPage` and the light colour mode; colours come from the tokens in `docs/agents/palette.md`. |
 
 ## Verified imports
@@ -155,7 +187,8 @@ flowchart LR
 - `home.vue`: `shared/student-id`.
 - `review/[studentNumber].vue`: `CourseProgressSection`, `ConversationList`, `LearningPlanCard`, `LatestActivityTable`, `shared/staff-review` (type), `staff/landing`, `staff/time-text`. `CourseProgressSection` imports `shared/staff-review` (type); `LearningPlanCard` imports `shared/staff-review` (types) and `staff/time-text`; `LatestActivityTable` imports `shared/staff-review` (type), `review/activity-pages` and `staff/time-text`. `review/conversation.vue`: `ChatMarkdown`, `workspace/message-style`, `workspace/conversation-dates`, `shared/turn` (`agentNames`), `shared/staff-review` (type).
 - `profile.vue`: `StudentResponse` (type) from `server/student`.
-- `admin/index.vue`: `AdminHeader`, `VerdictDrawer`, `admin/decisions` (types). `admin/settings.vue` and `admin/students.vue`: `AdminHeader`, `admin/decisions` (type), `admin/message`. `admin/students.vue` also imports `shared/student-number`. `admin/security.vue`: `AdminHeader`, `BusySpinner`, `CyberCaseRow`, `CyberRunSummary`, `admin/message`, `admin/decisions` (type) and `#shared/injection-suite` (`securitySummary` and the view, run-event and record types). `CyberCaseRow` imports `injectionCategoryLabels`; it and `CyberRunSummary` are presentational and serve both the live run and the saved record views. `sign-in.vue`, `lecturer.vue` and `AdminHeader.vue` also import `staff/landing`. `lecturer.vue` imports `CourseInsightsPanel`, `CourseEditor` and `CoursePreviewPanel`; `CourseInsightsPanel` imports `ModuleStatusChart`, `CourseProgressHistogram`, `lecturer/course-insights` and `shared/campus`; `ModuleStatusChart` and `CourseProgressHistogram` import `StudentListPanel` and `lecturer/course-insights`; `CourseEditor` imports `MermaidDiagram`.
+- `admin/index.vue`: `AdminHeader`, `VerdictDrawer`, `admin/decisions` (types). `admin/settings.vue` and `admin/students.vue`: `AdminHeader`, `admin/decisions` (type), `admin/message`. `admin/students.vue` also imports `shared/student-number`. `admin/security.vue`: `AdminHeader`, `BusySpinner`, `CyberCaseRow`, `CyberRunSummary`, `admin/message`, `admin/decisions` (type) and `#shared/injection-suite` (`securitySummary` and the view, run-event and record types). `CyberCaseRow` imports `injectionCategoryLabels`; it and `CyberRunSummary` are presentational and serve both the live run and the saved record views. `sign-in.vue`, `lecturer.vue` and `AdminHeader.vue` also import `staff/landing`. `lecturer.vue` imports `CourseInsightsPanel`, `CourseEditor` and `CoursePreviewPanel`; `CourseInsightsPanel` imports `StudentFilters`, `CoursePath`, `ProgressGroupsPie`, `StudentPortrait`, `lecturer/course-insights`, `lecturer/course-overview` and `lecturer/student-filters`; `StudentFilters` imports `shared/campus`, `lecturer/course-overview` and `lecturer/student-filters`; `CoursePath` imports `StudentChips` and `lecturer/course-insights`; `StudentChips` imports `StudentPortrait`; `CourseEditor` imports `MermaidDiagram`.
 - `AboutSampleTurn`, `AboutShieldDiagram` and `AboutLearningRoadmap` are used in templates without an import (Nuxt component auto-registration from `components/about/`). `RecordingNotice` is the same, from `components/`, on `home.vue` and `profile.vue`.
 - Middleware is attached by name in `definePageMeta`: `index.vue` uses `['signed-in', 'staff-landing', 'workspace-layout']`; `profile.vue` uses `['signed-in', 'staff-landing']`; the five admin pages and `lecturer.vue` use `'signed-in'`. `home.vue`, `sign-in.vue` and `sign-up.vue` set none.
 - Nothing imports the pages; Nuxt routes them from the file names (`review/conversation.vue` sets its own path). No test imports them (`lecturer/course-insights.ts` has `tests/course-insights.test.ts`, `review/activity-pages.ts` has `tests/activity-pages.test.ts`); the Playwright specs in `web/e2e/` drive them in a browser.
+- `lecturer.vue`: `CourseEditor`, `CourseInsightsPanel`, `CoursePreviewPanel`, `ClassOverview`, `StudentFilters`, `StudentRoster`, `lecturer/course-insights`, `lecturer/student-filters`, `shared/lecturer` (types), `staff/landing`. `ClassOverview`: `PieChart`, `ProgressGroupsPie`, `lecturer/course-overview`. `ProgressGroupsPie`: `PieChart`, `lecturer/course-overview`. `StudentRoster`: `ModuleRing`, `StudentPortrait`, `shared/lecturer` (types). `PieChart` and `ModuleRing`: `lecturer/course-overview`.

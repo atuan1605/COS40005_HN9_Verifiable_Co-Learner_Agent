@@ -116,7 +116,7 @@ How far a student is through a course: the mastered modules out of every module 
 _Avoid_: completion, course completion, overall mastery
 
 **Course insights**:
-The owning lecturer's charts of where the students enrolled in their course stand: how many have each module mastered, open or closed, and how the students spread across **Course progress**. Derived from the same stored mastery as **Course progress** and never stored. An administrator never sees them, because an administrator never sees mastery.
+The owning lecturer's view of where the students enrolled in their course stand now: which module each student is working on (the first one open to them) and how many have mastered it, how the students spread across **Course progress**, and who is furthest behind. Derived from the same stored mastery as **Course progress** and never stored. An administrator never sees them, because an administrator never sees mastery.
 _Avoid_: analytics, dashboard, statistics
 
 **Unlocked module**:
