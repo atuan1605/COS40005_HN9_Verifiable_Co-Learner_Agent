@@ -13,7 +13,7 @@ const props = defineProps<{
 }>()
 
 const hovered = ref<string | null>(null)
-// The pointer's slice stands out while it is there, then the filter's again.
+// A filter's slice looks as a hovered one does; the pointer's takes over while it is there.
 const active = computed(() => hovered.value ?? props.highlight ?? null)
 const total = computed(() => props.slices.reduce((sum, slice) => sum + slice.count, 0))
 const percent = (count: number) => total.value ? Math.round((count * 100) / total.value) : 0
@@ -22,30 +22,21 @@ const drawn = computed(() => {
   return props.slices.filter(slice => slice.count > 0).map((slice) => {
     const from = turn
     turn += slice.count / total.value
-    // The filter's slice is pulled out from the centre, unless it is the whole pie.
-    const middle = (from + turn) * Math.PI - Math.PI / 2
-    const pulled = slice.label === props.highlight && slice.count < total.value
-    const shift = pulled ? `translate(${Math.cos(middle) * 6} ${Math.sin(middle) * 6})` : undefined
-    return { ...slice, shift, path: ringSegment(from, turn, 50, 0) }
+    return { ...slice, path: ringSegment(from, turn, 50, 0) }
   })
 })
 </script>
 
 <template>
   <div class="flex flex-wrap items-center gap-5">
-    <!-- The box has room around the pie for a pulled-out slice. -->
-    <svg viewBox="-7 -7 114 114" class="size-40 shrink-0" role="img" :aria-label="label">
+    <svg viewBox="0 0 100 100" class="size-36 shrink-0" role="img" :aria-label="label">
       <circle v-if="!total" cx="50" cy="50" r="50" class="fill-ink-100" />
       <path
         v-for="slice in drawn"
         :key="slice.label"
         :d="slice.path"
-        :transform="slice.shift"
-        :class="[
-          slice.fill,
-          highlight === slice.label ? 'stroke-ink-900' : 'stroke-paper',
-          active && active !== slice.label ? 'opacity-25' : '',
-        ]"
+        class="stroke-paper"
+        :class="[slice.fill, active && active !== slice.label ? 'opacity-35' : '']"
         stroke-width="1.2"
         @pointerenter="hovered = slice.label"
         @pointerleave="hovered = null"
@@ -58,10 +49,7 @@ const drawn = computed(() => {
         v-for="slice in slices"
         :key="slice.label"
         class="flex items-center gap-2 rounded-sm px-1.5 py-1"
-        :class="[
-          active === slice.label ? 'bg-ink-100' : '',
-          highlight === slice.label ? 'font-semibold ring-1 ring-brand-500' : '',
-        ]"
+        :class="active === slice.label ? 'bg-ink-100' : ''"
         :aria-current="highlight === slice.label ? 'true' : undefined"
         @pointerenter="hovered = slice.label"
         @pointerleave="hovered = null"
