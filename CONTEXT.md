@@ -112,8 +112,12 @@ The picture of the course that shows every module, grouped into parts, as master
 _Avoid_: knowledge map, skill tree, course map, progress map
 
 **Course progress**:
-How far a student is through a course: the mastered modules out of the modules that have content, as a count and a whole percentage rounded down. Modules listed without content are left out, so 100% is reachable. It is derived from stored **Mastery** and never stored, and the student's roadmap and the lecturer's screens use the same derivation.
+How far a student is through a course: the mastered modules out of every module the course lists, as a count and a whole percentage rounded down. Modules listed without content still count, so 100% is reached only when the whole course is mastered. It is derived from stored **Mastery** and never stored, and the student's roadmap and the lecturer's screens use the same derivation.
 _Avoid_: completion, course completion, overall mastery
+
+**Course insights**:
+The owning lecturer's charts of where the students enrolled in their course stand: how many have each module mastered, open or closed, and how the students spread across **Course progress**. Derived from the same stored mastery as **Course progress** and never stored. An administrator never sees them, because an administrator never sees mastery.
+_Avoid_: analytics, dashboard, statistics
 
 **Unlocked module**:
 A module that is open or mastered. Module 1 is unlocked from the start; each later module unlocks when the one before it is mastered, and stays unlocked even if mastery later falls or the lecturer raises the mastery threshold.
@@ -187,7 +191,7 @@ The code currently in the student's editor that has not been submitted. Kept on 
 _Avoid_: save, autosave
 
 **Staff review**:
-The read-only page where a lecturer, for a student enrolled in a course they own, or an administrator, for any student, looks at that student's latest activity, submissions with their code and test results, and conversation, beside the **Review signals**. A student never sees it, and opening it is recorded in the **Staff access log**.
+The read-only page where a lecturer, for a student enrolled in a course they own, or an administrator, for any student, looks at that student's latest activity, submissions with their code and test results, learning plans, **Course progress** with each module's mastery and whether it is unlocked or closed, and a list of their conversations, beside the **Review signals**. Each conversation, the student's messages included, opens on a page of its own. A student never sees it, and opening it or one of its conversation pages is recorded in the **Staff access log**.
 _Avoid_: monitoring, surveillance, audit
 
 **Review signal**:
@@ -195,7 +199,7 @@ A prompt on the staff review page for a person to look at some work: a large pas
 _Avoid_: flag, alert, cheating detection, score
 
 **Staff access log**:
-The record of every time a lecturer or an administrator opened a student's records: who, which student, what they opened and when. Written before any record is handed over, append-only, and readable only by an administrator.
+The record of every time a lecturer or an administrator opened a student's records: who, which student, what they opened (the staff review, or one module's conversation) and when. Written before any record is handed over, append-only, and readable only by an administrator.
 _Avoid_: audit log, activity log
 
 ### Standing
