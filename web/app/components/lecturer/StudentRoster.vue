@@ -2,6 +2,7 @@
 import { campuses } from '#shared/campus'
 import type { LecturerCourse, LecturerStudent } from '#shared/lecturer'
 import ModuleRing from '~/components/lecturer/ModuleRing.vue'
+import StudentPortrait from '~/components/lecturer/StudentPortrait.vue'
 
 // A course's enrolled students: searchable, filtered by campus and sorted on the page.
 const props = defineProps<{ course: LecturerCourse }>()
@@ -134,10 +135,7 @@ function enrolledText(value: string): string {
           >
             <td class="px-3 py-3 max-md:col-span-2 max-md:py-1">
               <div class="flex items-center gap-3">
-                <!-- The default portrait: the lecturer response carries no profile picture. -->
-                <span class="block size-10 shrink-0 overflow-hidden rounded-full border border-default bg-ink-100" aria-hidden="true">
-                  <img src="/portraits/student.png" alt="" class="size-full object-cover [image-rendering:pixelated]">
-                </span>
+                <StudentPortrait class="size-10" />
                 <div class="min-w-0">
                   <p class="font-medium text-highlighted [overflow-wrap:anywhere]">
                     {{ student.displayName }}

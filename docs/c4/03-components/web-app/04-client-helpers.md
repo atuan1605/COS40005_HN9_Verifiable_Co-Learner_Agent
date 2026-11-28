@@ -26,8 +26,8 @@ flowchart LR
   reviewPage["<b>pages/review/[studentNumber].vue</b>"]:::near
   reviewParts["<b>components/review/</b><br/>ConversationList,<br/>LearningPlanCard"]:::near
   activityTableC["<b>LatestActivityTable.vue</b>"]:::near
-  overviewParts["<b>components/lecturer/</b><br/>ClassOverview, PieChart,<br/>ModuleRing"]:::near
-  insights["<b>components/lecturer/</b><br/>CourseInsightsPanel,<br/>ModuleStatusChart,<br/>CourseProgressHistogram"]:::near
+  overviewParts["<b>components/lecturer/</b><br/>ClassOverview, ProgressGroupsPie,<br/>PieChart, ModuleRing"]:::near
+  insights["<b>components/lecturer/</b><br/>CourseInsightsPanel,<br/>CoursePath"]:::near
   turnTypes["<b>shared/turn.ts</b>"]:::near
   ls[("<b>localStorage</b>")]:::ext
   cookie[("<b>cookie</b><br/>workspace-layout")]:::ext
@@ -44,7 +44,7 @@ flowchart LR
     record["<b>activity/record.ts</b><br/>recordStudentActivity"]:::comp
     timeTextH["<b>staff/time-text.ts</b><br/>timeText"]:::comp
     paging["<b>review/activity-pages.ts</b><br/>activityPage, pageOfEvent"]:::comp
-    courseInsights["<b>lecturer/course-insights.ts</b><br/>Insights chart data"]:::comp
+    courseInsights["<b>lecturer/course-insights.ts</b><br/>Insights figures"]:::comp
     courseOverview["<b>lecturer/course-overview.ts</b><br/>Overview figures and pie shapes"]:::comp
   end
 
@@ -61,8 +61,9 @@ flowchart LR
   activityTableC -->|"timeText"| timeTextH
   activityTableC -->|"activityPage, pageOfEvent"| paging
   overviewParts -->|"classSummary, progressGroups,<br/>ringSegment"| courseOverview
-  courseOverview -->|"moduleStatusOrder"| courseInsights
-  insights -->|"moduleStatus, progressBands,<br/>studentsAtCampus, studentCountText"| courseInsights
+  courseInsights -->|"moduleStateOf"| courseOverview
+  insights -->|"coursePath, furthestBehind,<br/>studentsAtCampus, studentCountText"| courseInsights
+  insights -->|"classSummary"| courseOverview
   chatPanel -->|"dateMessages"| dates
   convPage -->|"dateMessages"| dates
   signin -->|"claimIntro, introStart, ..."| intro
@@ -91,15 +92,15 @@ flowchart LR
 | `workspace/conversation-dates.ts` | The day separator and time of each message, in a given time zone (the browser's by default). | None. |
 | `staff/time-text.ts` | `timeText`: a record's time as the staff review writes it (UTC), or "Before times were kept". | None. |
 | `review/activity-pages.ts` | Pure paging of the staff review's Latest activity, 20 rows a page, finding an event by its place in the list. | None. |
-| `lecturer/course-overview.ts` | Pure derivation for the lecturer Overview: class totals, the Course progress groups, module states totalled by state, and the SVG path of a pie slice or ring segment. Imports `lecturer/course-insights.ts` (the state order). Imported by `ClassOverview.vue`, `PieChart.vue`, `ModuleRing.vue` and `tests/course-overview.test.ts`. |
-| `lecturer/course-insights.ts` | Pure derivation of the Insights chart data from the lecturer response: the campus filter, each module's students per state, the segment widths (an occupied segment keeps a minimum width so it can be pointed at), the students per Course progress band, and the student count in words. | None. |
+| `lecturer/course-overview.ts` | Pure derivation for the lecturer Overview: class totals, the Course progress groups, a student's state for one module, module states totalled by state, and the SVG path of a pie slice or ring segment. Imported by `ClassOverview.vue`, `ProgressGroupsPie.vue`, `PieChart.vue`, `ModuleRing.vue`, `CourseInsightsPanel.vue`, `lecturer/course-insights.ts` and `tests/course-overview.test.ts`. |
+| `lecturer/course-insights.ts` | Pure derivation of the Insights figures from the lecturer response: the campus filter, the course path (who is working on each module, who has none open), the students furthest behind, and the student count in words. | None. |
 | `sign-in/intro.ts` | Decides whether the sign-in intro plays (once per device, never with reduced motion) and computes the starting transform; exports an inline head script. | `localStorage` key `colearner-sign-in-intro`. |
 | `activity/record.ts` | Posts one client report to `POST /api/student`: `signed_in`, `module_opened`, `mode_switched`, `layout_switched`, `code_run`, `run_finished`, `pasted`, `went_idle`, or `returned`. A failure does not undo the action. A finished run reports the exercise id, and separately its outcome and error name. A paste reports the character count. The workspace reports going quiet and coming back. | None. The server keeps the activity log, and no page lists it. |
 
 ## Verified imports
 
-- Imports from this repo: type-only, `mindmap/arrangement.ts` (`RoadmapModule` from `shared/turn`) and `lecturer/course-insights.ts` (`shared/campus`, `shared/lecturer`, `shared/turn`). The other files import nothing from this repo. `activity/record.ts` calls `$fetch`, which Nuxt provides.
-- Importers: `drafts/store` by `pages/index.vue`, `PracticePanel.vue`, `draft-store.test.ts`; `mindmap/arrangement` by `MindmapCanvas.vue`, `mindmap-arrangement.test.ts`; `workspace/layout` by `pages/index.vue`, `middleware/workspace-layout.ts`; `workspace/message-style` and `workspace/conversation-dates` by `ConversationPanel.vue` and `pages/review/conversation.vue`; `workspace/chat-markdown` by `ChatMarkdown.vue` and `ChatInline.vue` (type), `chat-markdown.test.ts`; `sign-in/intro` by `pages/sign-in.vue`, `sign-in-intro.test.ts`; `activity/record` by `pages/index.vue`, `pages/sign-in.vue` and `pages/sign-up.vue`; `staff/time-text` by `pages/review/[studentNumber].vue`, `ConversationList.vue`, `LearningPlanCard.vue` and `LatestActivityTable.vue`; `review/activity-pages` by `LatestActivityTable.vue`, `activity-pages.test.ts`; `lecturer/course-insights` by `CourseInsightsPanel.vue`, `ModuleStatusChart.vue`, `CourseProgressHistogram.vue`, `course-insights.test.ts`.
+- Imports from this repo: type-only, `mindmap/arrangement.ts` (`RoadmapModule` from `shared/turn`) and `lecturer/course-insights.ts` (`shared/campus`, `shared/lecturer`, and `moduleStateOf` from `lecturer/course-overview.ts`, which imports `shared/lecturer` and `shared/turn`). The other files import nothing from this repo. `activity/record.ts` calls `$fetch`, which Nuxt provides.
+- Importers: `drafts/store` by `pages/index.vue`, `PracticePanel.vue`, `draft-store.test.ts`; `mindmap/arrangement` by `MindmapCanvas.vue`, `mindmap-arrangement.test.ts`; `workspace/layout` by `pages/index.vue`, `middleware/workspace-layout.ts`; `workspace/message-style` and `workspace/conversation-dates` by `ConversationPanel.vue` and `pages/review/conversation.vue`; `workspace/chat-markdown` by `ChatMarkdown.vue` and `ChatInline.vue` (type), `chat-markdown.test.ts`; `sign-in/intro` by `pages/sign-in.vue`, `sign-in-intro.test.ts`; `activity/record` by `pages/index.vue`, `pages/sign-in.vue` and `pages/sign-up.vue`; `staff/time-text` by `pages/review/[studentNumber].vue`, `ConversationList.vue`, `LearningPlanCard.vue` and `LatestActivityTable.vue`; `review/activity-pages` by `LatestActivityTable.vue`, `activity-pages.test.ts`; `lecturer/course-insights` by `CourseInsightsPanel.vue`, `CoursePath.vue`, `course-insights.test.ts`.
 - Each file here has a unit test under `web/tests/` except `workspace/layout.ts`, `workspace/message-style.ts`, `staff/time-text.ts` and `activity/record.ts`. What the server stores for a report is covered by `student-handler.test.ts`.
 
 ## Notes

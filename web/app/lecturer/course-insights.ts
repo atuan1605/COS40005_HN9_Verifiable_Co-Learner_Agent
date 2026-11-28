@@ -1,28 +1,8 @@
 import type { Campus } from '#shared/campus'
 import type { LecturerCourse, LecturerStudent } from '#shared/lecturer'
-import type { ModuleState } from '#shared/turn'
+import { moduleStateOf } from './course-overview'
 
-// What the Insights tab draws, derived from the lecturer response. Nothing is stored or requested.
-
-export const moduleStatusOrder: readonly ModuleState[] = ['mastered', 'open', 'closed']
-
-// The percentage of the bar the smallest occupied segment keeps, so it can still be pointed at.
-const smallestWidth = 4
-
-export interface ModuleStatusSegment {
-  state: ModuleState
-  students: LecturerStudent[]
-  // Percentages of the bar.
-  start: number
-  width: number
-}
-
-export interface ModuleStatusRow {
-  moduleId: string
-  name: string
-  // Always mastered, open, closed.
-  segments: ModuleStatusSegment[]
-}
+// What the Insights tab shows, derived from the lecturer response. Nothing is stored or requested.
 
 export function studentCountText(count: number): string {
   return `${count} ${count === 1 ? 'student' : 'students'}`
@@ -33,50 +13,30 @@ export function studentsAtCampus(students: readonly LecturerStudent[], campus: C
   return students.filter(student => campus === '' || student.campus === campus)
 }
 
-export function moduleStatus(modules: LecturerCourse['modules'], students: readonly LecturerStudent[]): ModuleStatusRow[] {
-  return modules.map(({ id, name }) => {
-    const groups = moduleStatusOrder.map(state => ({
-      state,
-      students: students.filter(student => (student.moduleStates[id] ?? 'closed') === state),
-    }))
-    const widths = segmentWidths(groups.map(group => group.students.length))
-    let start = 0
-    return {
-      moduleId: id,
-      name,
-      segments: groups.map((group, index) => {
-        const segment = { ...group, start, width: widths[index]! }
-        start += segment.width
-        return segment
-      }),
-    }
-  })
-}
-
-// Bands of whole percentage points, as Course progress is, so each student falls in exactly one.
-const progressRanges = [[0, 19], [20, 39], [40, 59], [60, 79], [80, 100]] as const
-
-export interface ProgressBand {
-  label: string
-  students: LecturerStudent[]
-}
-
-// The Course progress distribution: always every band, lowest first.
-export function progressBands(students: readonly LecturerStudent[]): ProgressBand[] {
-  return progressRanges.map(([from, to]) => ({
-    label: `${from}–${to}%`,
-    students: students.filter(({ progress }) => progress.percent >= from && progress.percent <= to),
+// The course as a path: each student stands on the first module that is open to them. A student
+// with none open, having mastered everything they can open, is listed apart.
+export function coursePath(modules: LecturerCourse['modules'], students: readonly LecturerStudent[]) {
+  const standing = students.map(student => ({
+    student,
+    moduleId: modules.find(module => moduleStateOf(student, module.id) === 'open')?.id ?? null,
   }))
+  const on = (moduleId: string | null) => standing.filter(item => item.moduleId === moduleId).map(item => item.student)
+  return {
+    modules: modules.map(({ id, name }, index) => ({
+      id,
+      name,
+      number: index + 1,
+      here: on(id),
+      mastered: students.filter(student => moduleStateOf(student, id) === 'mastered').length,
+    })),
+    noneOpen: on(null),
+  }
 }
 
-// Widths by share, except that an occupied segment never drops below the smallest width: what it
-// gains is taken from the others in proportion.
-function segmentWidths(counts: readonly number[]): number[] {
-  const total = counts.reduce((sum, count) => sum + count, 0)
-  if (total === 0) return counts.map(() => 0)
-  const shares = counts.map(count => (count * 100) / total)
-  const small = shares.map(share => share > 0 && share < smallestWidth)
-  const reserved = small.filter(Boolean).length * smallestWidth
-  const rest = shares.reduce((sum, share, index) => small[index] ? sum : sum + share, 0)
-  return shares.map((share, index) => small[index] ? smallestWidth : (share * (100 - reserved)) / rest)
+// The students with the least Course progress, leaving out those who have finished the course.
+export function furthestBehind(students: readonly LecturerStudent[], most: number): LecturerStudent[] {
+  return students
+    .filter(student => student.progress.percent < 100)
+    .sort((left, right) => left.progress.percent - right.progress.percent || left.displayName.localeCompare(right.displayName, 'en'))
+    .slice(0, most)
 }

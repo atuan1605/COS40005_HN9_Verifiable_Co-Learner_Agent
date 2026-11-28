@@ -1,6 +1,5 @@
 import type { LecturerCourse, LecturerStudent } from '#shared/lecturer'
 import type { ModuleState } from '#shared/turn'
-import { moduleStatusOrder } from './course-insights'
 
 // The figures and shapes the lecturer's Overview draws, derived from the lecturer response.
 
@@ -30,13 +29,15 @@ export function progressGroups(students: readonly LecturerStudent[]) {
   }))
 }
 
+const stateOrder: readonly ModuleState[] = ['mastered', 'open', 'closed']
+
 export function moduleStateOf(student: LecturerStudent, moduleId: string): ModuleState {
   return student.moduleStates[moduleId] ?? 'closed'
 }
 
 // Every listed module of every student, counted by state.
 export function moduleStateTotals(modules: LecturerCourse['modules'], students: readonly LecturerStudent[]) {
-  return moduleStatusOrder.map(state => ({
+  return stateOrder.map(state => ({
     state,
     count: students.reduce((sum, student) =>
       sum + modules.filter(module => moduleStateOf(student, module.id) === state).length, 0),
