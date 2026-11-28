@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { coursePath, furthestBehind } from '../app/lecturer/course-insights'
+import { coursePath, furthestBehind, studentPage } from '../app/lecturer/course-insights'
 import type { LecturerStudent } from '../shared/lecturer'
 import type { ModuleState } from '../shared/turn'
 
@@ -40,5 +40,21 @@ describe('furthestBehind', () => {
 
     expect(furthestBehind([chi, done, em, binh, an], 3).map(one => one.displayName)).toEqual(['An', 'Em', 'Binh'])
     expect(furthestBehind([done], 3)).toEqual([])
+  })
+})
+
+describe('studentPage', () => {
+  const crowd = Array.from({ length: 23 }, (_, index) => student(`S${index + 1}`, null, {}))
+  const shown = (page: number) => studentPage(crowd, page).students.map(one => one.displayName)
+
+  it('holds 10 students, in the order given, and says how many pages there are', () => {
+    expect(studentPage(crowd, 1).pageCount).toBe(3)
+    expect(shown(1)).toEqual(crowd.slice(0, 10).map(one => one.displayName))
+    expect(shown(3)).toEqual(['S21', 'S22', 'S23'])
+  })
+
+  it('keeps one page when there are few students or none', () => {
+    expect(studentPage([an], 1).pageCount).toBe(1)
+    expect(studentPage([], 1)).toEqual({ pageCount: 1, students: [] })
   })
 })

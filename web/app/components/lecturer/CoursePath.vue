@@ -32,12 +32,12 @@ const share = (count: number) => props.students.length ? (count * 100) / props.s
           </div>
           <p class="mt-1 text-xs text-muted">{{ module.here.length }} working here, {{ module.mastered }} mastered it</p>
         </div>
-        <StudentChips :students="module.here" />
+        <StudentChips :students="module.here" :label="module.name" />
       </li>
       <li class="relative grid gap-x-4 gap-y-2 pl-6 md:grid-cols-[16rem_1fr]" :aria-label="`No module open: ${studentCountText(path.noneOpen.length)}`">
         <span class="absolute top-0 -left-[11px] size-6 rounded-full bg-emerald-700" aria-hidden="true" />
         <p class="text-sm font-medium text-highlighted">No module open: {{ path.noneOpen.length }}</p>
-        <StudentChips :students="path.noneOpen" />
+        <StudentChips :students="path.noneOpen" label="No module open" />
       </li>
     </ol>
   </section>

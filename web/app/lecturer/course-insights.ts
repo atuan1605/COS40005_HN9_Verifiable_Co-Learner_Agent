@@ -32,3 +32,13 @@ export function furthestBehind(students: readonly LecturerStudent[], most: numbe
     .sort((left, right) => left.progress.percent - right.progress.percent || left.displayName.localeCompare(right.displayName, 'en'))
     .slice(0, most)
 }
+
+const studentsPerPage = 10
+
+// A page, counted from 1, of the students listed on one row of the course path.
+export function studentPage(students: readonly LecturerStudent[], page: number) {
+  return {
+    pageCount: Math.max(1, Math.ceil(students.length / studentsPerPage)),
+    students: students.slice((page - 1) * studentsPerPage, page * studentsPerPage),
+  }
+}
