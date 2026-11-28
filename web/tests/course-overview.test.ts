@@ -33,9 +33,12 @@ describe('the lecturer course overview', () => {
       .toEqual([{ state: 'mastered', count: 1 }, { state: 'open', count: 2 }, { state: 'closed', count: 1 }])
   })
 
-  it('draws a whole turn without collapsing to nothing', () => {
-    const whole = ringSegment(0, 1, 50, 0)
-    expect(whole).toContain('A 50 50 0 1 1')
-    expect(whole).not.toContain('A 50 50 0 1 1 50 0 Z')
+  it('draws a pie that is all one slice as a circle, with no line to the centre', () => {
+    expect(ringSegment(0, 1, 50, 0)).not.toContain('M 50 50')
+  })
+
+  it('draws a whole ring without collapsing to nothing', () => {
+    // An arc that ended exactly where it started would draw nothing.
+    expect(ringSegment(0, 1, 50, 34).startsWith('M 50 0 A 50 50 0 1 1 50 0 ')).toBe(false)
   })
 })

@@ -12,20 +12,24 @@ export function classSummary(students: readonly LecturerStudent[]) {
   }
 }
 
-const groups = [
+export const progressGroupRanges = [
   { key: 'not-started', label: 'Not started (0%)', from: 0, to: 0 },
   { key: 'starting', label: 'Starting (1–29%)', from: 1, to: 29 },
   { key: 'part-way', label: 'Part way (30–69%)', from: 30, to: 69 },
   { key: 'nearly-there', label: 'Nearly there (70–100%)', from: 70, to: 100 },
 ] as const
 
-export type ProgressGroupKey = typeof groups[number]['key']
+export type ProgressGroupKey = typeof progressGroupRanges[number]['key']
+
+export function progressGroupOf(percent: number): ProgressGroupKey {
+  return progressGroupRanges.find(({ from, to }) => percent >= from && percent <= to)!.key
+}
 
 export function progressGroups(students: readonly LecturerStudent[]) {
-  return groups.map(({ key, label, from, to }) => ({
+  return progressGroupRanges.map(({ key, label }) => ({
     key,
     label,
-    count: students.filter(({ progress }) => progress.percent >= from && progress.percent <= to).length,
+    count: students.filter(({ progress }) => progressGroupOf(progress.percent) === key).length,
   }))
 }
 
@@ -47,6 +51,10 @@ export function moduleStateTotals(modules: LecturerCourse['modules'], students: 
 // An SVG path in a 100 by 100 box, between two turns of the circle: 0 is twelve o'clock and 1 is
 // all the way round. An inner radius of 0 gives a pie slice, otherwise a ring segment.
 export function ringSegment(from: number, to: number, outer: number, inner: number): string {
+  // A pie that is all one slice is a circle: two half arcs, with no edge to the centre to stroke.
+  if (inner === 0 && to - from > 0.9999) {
+    return `M 50 ${50 - outer} A ${outer} ${outer} 0 1 1 50 ${50 + outer} A ${outer} ${outer} 0 1 1 50 ${50 - outer} Z`
+  }
   // An arc that ends where it starts draws nothing, so a whole turn stops just short.
   const end = Math.min(to, from + 0.9999)
   const point = (turn: number, radius: number) => {

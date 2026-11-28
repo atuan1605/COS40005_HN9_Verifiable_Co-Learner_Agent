@@ -3,7 +3,7 @@ import { lecturerAccount } from '../server/auth/demo-accounts'
 import { resetDemoAccounts } from './reset-demo-accounts'
 
 // The lecturer's Insights tab: the course path, the Course progress pie, the students furthest
-// behind, the campus filter they share and the way through to a staff review, at desktop and phone
+// behind, the filters they share and the way through to a staff review, at desktop and phone
 // width. The demo students start at the Hanoi campus.
 //
 // The expected figures come from supabase/seed.sql. Bình's seeded evidence masters Modules 1 to 4
@@ -51,11 +51,26 @@ for (const width of widths) {
       if (new URL(request.url()).pathname.startsWith('/api/lecturer')) requests.push(request.url())
     })
     await page.getByLabel('Campus').selectOption('Da Nang')
-    await expect(insights.getByText('No students at Da Nang.')).toBeVisible()
+    await expect(insights.getByText('No students match these filters.')).toBeVisible()
     await expect(path).toHaveCount(0)
     await expect(pie).toHaveCount(0)
     await page.getByLabel('Campus').selectOption('Hanoi')
     await expect(first).toBeVisible()
+
+    // The other filters narrow the same three panels, and combine.
+    await page.getByRole('button', { name: 'Clear filters' }).click()
+    await page.getByLabel('Search students').fill('bình')
+    await expect(behind).toHaveCount(1)
+    await expect(insights.getByTestId('insights-student-count')).toHaveText('1 of 2 students shown')
+    await page.getByLabel('Search students').fill('')
+    await page.getByLabel('Course progress', { exact: true }).selectOption('not-started')
+    await expect(behind).toHaveAccessibleName("Review An's work, Course progress 0%")
+    await page.getByLabel('Current module').selectOption({ label: firstModule })
+    await expect(behind).toHaveCount(1)
+    await page.getByLabel('Course progress', { exact: true }).selectOption('part-way')
+    await expect(insights.getByText('No students match these filters.')).toBeVisible()
+    await page.getByRole('button', { name: 'Clear filters' }).click()
+    await expect(behind).toHaveCount(2)
     expect(requests).toEqual([])
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false)
 

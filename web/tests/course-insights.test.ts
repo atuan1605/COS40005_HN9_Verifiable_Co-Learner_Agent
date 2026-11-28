@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { coursePath, furthestBehind, studentsAtCampus } from '../app/lecturer/course-insights'
+import { coursePath, filterStudents, furthestBehind, noFilters, noModuleOpen, type InsightsFilters } from '../app/lecturer/course-insights'
 import type { LecturerStudent } from '../shared/lecturer'
 import type { ModuleState } from '../shared/turn'
 
@@ -17,11 +17,37 @@ const an = student('An', 'Hanoi', { m1: 'open' }, 0)
 const binh = student('Binh', 'Can Tho', { m1: 'mastered', m2: 'open', m3: 'open' }, 33)
 const chi = student('Chi', null, { m1: 'mastered', m2: 'mastered', m3: 'closed' }, 66)
 
-describe('studentsAtCampus', () => {
-  it('keeps everyone for All campuses and only that campus otherwise', () => {
-    expect(studentsAtCampus([an, binh, chi], '')).toEqual([an, binh, chi])
-    expect(studentsAtCampus([an, binh, chi], 'Can Tho')).toEqual([binh])
-    expect(studentsAtCampus([an, binh, chi], 'Da Nang')).toEqual([])
+describe('filterStudents', () => {
+  const all = [an, binh, chi]
+  const names = (filters: Partial<InsightsFilters>) =>
+    filterStudents(modules, all, { ...noFilters, ...filters }).map(one => one.displayName)
+
+  it('keeps everyone with no filter set', () => {
+    expect(names({})).toEqual(['An', 'Binh', 'Chi'])
+  })
+
+  it('narrows by campus, and by part of a name or student number whatever the case', () => {
+    expect(names({ campus: 'Can Tho' })).toEqual(['Binh'])
+    expect(names({ campus: 'Da Nang' })).toEqual([])
+    expect(names({ search: '  cH ' })).toEqual(['Chi'])
+    expect(filterStudents(modules, [{ ...an, studentNumber: 'SWB0042' }], { ...noFilters, search: 'b0042' })).toHaveLength(1)
+  })
+
+  it('narrows by Course progress group', () => {
+    expect(names({ group: 'not-started' })).toEqual(['An'])
+    expect(names({ group: 'part-way' })).toEqual(['Binh', 'Chi'])
+  })
+
+  it('narrows to the students working on one module, or with none open', () => {
+    // Binh has Files open too, but stands on Loops.
+    expect(names({ moduleId: 'm2' })).toEqual(['Binh'])
+    expect(names({ moduleId: 'm3' })).toEqual([])
+    expect(names({ moduleId: noModuleOpen })).toEqual(['Chi'])
+  })
+
+  it('applies every filter that is set together', () => {
+    expect(names({ group: 'part-way', moduleId: noModuleOpen })).toEqual(['Chi'])
+    expect(names({ group: 'not-started', campus: 'Can Tho' })).toEqual([])
   })
 })
 
