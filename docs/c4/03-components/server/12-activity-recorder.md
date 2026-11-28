@@ -15,7 +15,7 @@ flowchart LR
   classDef db fill:#0f766e,stroke:#0a4f4a,color:#ffffff
   linkStyle default stroke:#8b949e,stroke-width:1.5px
 
-  workspace["<b>pages/index.vue</b><br/>pages/sign-in.vue"]:::near
+  workspace["<b>pages/index.vue</b><br/>pages/sign-in.vue<br/>pages/sign-up.vue"]:::near
   studentRoute["<b>api/student.post.ts</b>"]:::near
   turnRoute["<b>routes/turn.post.ts</b>"]:::near
   student["<b>student/index.ts</b>"]:::near
@@ -42,7 +42,7 @@ flowchart LR
 
 | Type | Written by | Payload |
 |---|---|---|
-| `signed_in` | Student handler, reported from sign-in when the student is sent to the workspace | `{}`, and the course is null |
+| `signed_in` | Student handler, reported from sign-in or sign-up when the student is sent to the workspace | `{}`, and the course is null |
 | `module_opened` | Student handler, reported by the workspace after a module opens | `{ moduleId }` |
 | `mode_switched` | Student handler, reported by the workspace | `{ mode }`: `learn` or `practice` |
 | `layout_switched` | Student handler, reported by the workspace | `{ layout }`: `study` or `mindmap` |
@@ -69,11 +69,11 @@ A turn that opens or selects a module appends nothing. The workspace reports `mo
 
 Row-level security is on with no policy. Insert and select are granted to the server role only. Update and delete are granted to nobody, including the server role. `anon` and `authenticated` cannot read, update or delete.
 
-Sign-in, Home and the profile tell the student that their activity, submitted code and conversations are recorded, that their lecturers and administrators can review them, and that DeepSeek processes their conversations. No page lists the events. The student model does not import this component.
+Home and the profile tell the student that their activity, submitted code and conversations are recorded, that their lecturers and administrators can review them, and that DeepSeek processes their conversations. No page lists the events. The student model does not import this component.
 
 ## Verified imports
 
 - Runtime: `storage/supabase-activity-log.ts` imports `activityPayload` from `activity-recorder`. `student/index.ts` re-exports `handle-student.ts`, which is what `api/student.post.ts` imports.
 - Type only: `storage/supabase-activity-log.ts` imports `ActivityRecorder`. `student/handle-student.ts` imports `ActivityRecorder` and `ActivityEventType`. `turn/handle-turn.ts` imports `ActivityRecorder` and calls `forStudent` for the learning pattern. The routes do not import this folder; they construct `createSupabaseActivityLog` and pass it in.
-- Browser: `app/activity/record.ts` posts to `POST /api/student` and ignores a failure, so a missed report does not undo the action. `pages/index.vue` reports `module_opened` for the module the workspace opens onto and again when the student opens another, `mode_switched` only when the student chooses Learn or Practice, `layout_switched`, and both `code_run` and `run_finished` when a run ends (including a failure, a stop, or the practice panel going away while the run is still going). `run_finished` carries the outcome and the error name, never the code. A paste in the editor reports `pasted` with the character count. Three minutes without activity in Practice mode reports `went_idle`; the clock waits while a run or a check is in progress. The next activity, or leaving Practice, reports `returned` for the place that went quiet. `pages/sign-in.vue` reports `signed_in`. Applying a turn's own mode does not record a mode switch. The course preview does not report these events.
+- Browser: `app/activity/record.ts` posts to `POST /api/student` and ignores a failure, so a missed report does not undo the action. `pages/index.vue` reports `module_opened` for the module the workspace opens onto and again when the student opens another, `mode_switched` only when the student chooses Learn or Practice, `layout_switched`, and both `code_run` and `run_finished` when a run ends (including a failure, a stop, or the practice panel going away while the run is still going). `run_finished` carries the outcome and the error name, never the code. A paste in the editor reports `pasted` with the character count. Three minutes without activity in Practice mode reports `went_idle`; the clock waits while a run or a check is in progress. The next activity, or leaving Practice, reports `returned` for the place that went quiet. `pages/sign-in.vue` and `pages/sign-up.vue` report `signed_in`. Applying a turn's own mode does not record a mode switch. The course preview does not report these events.
 - Tests: `student-handler.test.ts` and `turn-endpoint.test.ts` use `createMemoryActivityLog`. `activity-log-migration.test.ts` runs the migration (and the note-with-first-link function) on PGlite. `activity-mindmap-boundary.test.ts` checks the live project.

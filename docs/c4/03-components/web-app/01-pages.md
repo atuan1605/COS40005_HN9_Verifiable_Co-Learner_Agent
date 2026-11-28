@@ -109,10 +109,11 @@ flowchart LR
 ## Verified imports
 
 - `index.vue`: `StudySuggestionToast`, `ConversationPanel`, `CourseRoadmap`, `MindmapNotes`, `MindmapCanvas`, `WorkingArea`, `shared/turn` (type), `shared/student-id`, `drafts/store`, `workspace/layout`, `activity/record`.
-- `sign-in.vue`: `shared/student-id`, `shared/student-email`, `sign-in/intro`, `activity/record`.
+- `sign-in.vue`: `shared/student-id`, `sign-in/intro`, `activity/record`.
+- `sign-up.vue`: `shared/student-email`, `shared/campus`, `activity/record`.
 - `home.vue`: `shared/student-id`.
 - `profile.vue`: `StudentResponse` (type) from `server/student`.
 - `admin/index.vue`: `AdminHeader`, `VerdictDrawer`, `admin/decisions` (types). `admin/settings.vue` and `admin/students.vue`: `AdminHeader`, `admin/decisions` (type), `admin/message`. `admin/students.vue` also imports `shared/student-number`. `admin/security.vue`: `AdminHeader`, `BusySpinner`, `CyberCaseRow`, `CyberRunSummary`, `admin/message`, `admin/decisions` (type) and `#shared/injection-suite` (`securitySummary` and the view, run-event and record types). `CyberCaseRow` imports `injectionCategoryLabels`; it and `CyberRunSummary` are presentational and serve both the live run and the saved record views. `sign-in.vue`, `lecturer.vue` and `AdminHeader.vue` also import `staff/landing`. `lecturer.vue` imports `CourseEditor` and `CoursePreviewPanel`; `CourseEditor` imports `MermaidDiagram`.
-- `AboutSampleTurn`, `AboutShieldDiagram` and `AboutLearningRoadmap` are used in templates without an import (Nuxt component auto-registration from `components/about/`). `RecordingNotice` is the same, from `components/`, on `sign-in.vue`, `home.vue` and `profile.vue`.
-- Middleware is attached by name in `definePageMeta`: `index.vue` uses `['signed-in', 'staff-landing', 'workspace-layout']`; `profile.vue` uses `['signed-in', 'staff-landing']`; the five admin pages and `lecturer.vue` use `'signed-in'`. `home.vue` and `sign-in.vue` set none.
+- `AboutSampleTurn`, `AboutShieldDiagram` and `AboutLearningRoadmap` are used in templates without an import (Nuxt component auto-registration from `components/about/`). `RecordingNotice` is the same, from `components/`, on `home.vue` and `profile.vue`.
+- Middleware is attached by name in `definePageMeta`: `index.vue` uses `['signed-in', 'staff-landing', 'workspace-layout']`; `profile.vue` uses `['signed-in', 'staff-landing']`; the five admin pages and `lecturer.vue` use `'signed-in'`. `home.vue`, `sign-in.vue` and `sign-up.vue` set none.
 - Nothing imports the pages; Nuxt routes them from the file names. No test imports them; the Playwright specs in `web/e2e/` drive them in a browser.

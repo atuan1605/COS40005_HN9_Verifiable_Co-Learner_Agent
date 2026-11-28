@@ -15,7 +15,7 @@ flowchart LR
   classDef ext fill:#8a5a00,stroke:#5c3c00,color:#ffffff
   linkStyle default stroke:#8b949e,stroke-width:1.5px
 
-  pages["<b>pages</b><br/>index, admin, lecturer,<br/>about, sign-in"]:::near
+  pages["<b>pages</b><br/>index, admin, lecturer,<br/>about, sign-in, sign-up"]:::near
   studentId["<b>shared/student-id.ts</b>"]:::near
   layout["<b>workspace/layout.ts</b>"]:::near
   auth["<b>Supabase Auth</b>"]:::ext
@@ -56,6 +56,6 @@ flowchart LR
 ## Verified
 
 - Imports from this repo: `signed-in.ts` imports `shared/student-id`; `staff-landing.ts` imports `staff/landing`; `workspace-layout.ts` imports `workspace/layout`. The two plugins import nothing from this repo.
-- Who reads `$supabase` (search for `$supabase`): `pages/sign-in.vue`, `pages/index.vue`, `pages/home.vue`, `middleware/signed-in.ts`.
+- Who reads `$supabase` (search for `$supabase`): `pages/sign-in.vue`, `pages/sign-up.vue`, `pages/index.vue`, `pages/home.vue`, `middleware/signed-in.ts`.
 - Middleware use (search for `definePageMeta`): `pages/index.vue`, `pages/lecturer.vue` and the two admin pages only.
 - No test imports these files.

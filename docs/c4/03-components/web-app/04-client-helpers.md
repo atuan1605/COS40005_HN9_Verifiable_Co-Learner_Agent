@@ -16,6 +16,7 @@ flowchart LR
 
   index["<b>pages/index.vue</b>"]:::near
   signin["<b>pages/sign-in.vue</b>"]:::near
+  signup["<b>pages/sign-up.vue</b>"]:::near
   practice["<b>PracticePanel.vue</b>"]:::near
   canvas["<b>MindmapCanvas.vue</b>"]:::near
   chatmd["<b>ChatMarkdown.vue</b>"]:::near
@@ -43,6 +44,7 @@ flowchart LR
   signin -->|"claimIntro, introStart, ..."| intro
   index -->|"recordStudentActivity"| record
   signin -->|"recordStudentActivity"| record
+  signup -->|"recordStudentActivity"| record
   arr -.->|"type: RoadmapModule"| turnTypes
   drafts -->|"key co-learner-draft:..."| ls
   arr -->|"key co-learner-roadmap-arrangement:..."| ls
@@ -66,7 +68,7 @@ flowchart LR
 ## Verified imports
 
 - Imports from this repo: only `mindmap/arrangement.ts` (type `RoadmapModule` from `shared/turn`). The other files import nothing from this repo. `activity/record.ts` calls `$fetch`, which Nuxt provides.
-- Importers: `drafts/store` by `pages/index.vue`, `PracticePanel.vue`, `draft-store.test.ts`; `mindmap/arrangement` by `MindmapCanvas.vue`, `mindmap-arrangement.test.ts`; `workspace/layout` by `pages/index.vue`, `middleware/workspace-layout.ts`; `workspace/chat-markdown` by `ChatMarkdown.vue` and `ChatInline.vue` (type), `chat-markdown.test.ts`; `sign-in/intro` by `pages/sign-in.vue`, `sign-in-intro.test.ts`; `activity/record` by `pages/index.vue` and `pages/sign-in.vue`.
+- Importers: `drafts/store` by `pages/index.vue`, `PracticePanel.vue`, `draft-store.test.ts`; `mindmap/arrangement` by `MindmapCanvas.vue`, `mindmap-arrangement.test.ts`; `workspace/layout` by `pages/index.vue`, `middleware/workspace-layout.ts`; `workspace/chat-markdown` by `ChatMarkdown.vue` and `ChatInline.vue` (type), `chat-markdown.test.ts`; `sign-in/intro` by `pages/sign-in.vue`, `sign-in-intro.test.ts`; `activity/record` by `pages/index.vue`, `pages/sign-in.vue` and `pages/sign-up.vue`.
 - Each file here has a unit test under `web/tests/` except `workspace/layout.ts` and `activity/record.ts`. What the server stores for a report is covered by `student-handler.test.ts`.
 
 ## Notes
