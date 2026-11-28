@@ -2,10 +2,13 @@ import { expect, test, type Page } from '@playwright/test'
 import { demoAccounts } from '../server/auth/demo-accounts'
 import { clearDemoCampus, deleteAccountByEmail, resetDemoAccounts } from './reset-demo-accounts'
 
-// A student signs in with a code emailed to them. The local mail catcher
-// (Mailpit, from `supabase start`) holds the email, so the code is read from it.
+// A student signs up with a code emailed to them, which proves the student email.
+// The local mail catcher (Mailpit, from `supabase start`) holds the email, so the
+// code is read from it. Sign-in itself is by password only.
 
 const mailCatcher = process.env.MAIL_CATCHER_URL ?? 'http://127.0.0.1:54324'
+
+const studentName = 'Sign Up Student'
 
 const widths = [
   { name: 'desktop', viewport: { width: 1440, height: 900 } },
@@ -18,11 +21,20 @@ for (const width of widths) {
       await page.setViewportSize(width.viewport)
     })
 
+    test('offers no code option on sign-in', async ({ page }) => {
+      await page.goto('/sign-in')
+      await waitForApp(page)
+      const main = page.getByRole('main')
+      await expect(main.getByLabel('Password')).toBeVisible()
+      await expect(main.getByRole('button')).toHaveCount(1)
+      await expect(main.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
+      await expect(main.getByText(/\bcode\b/i)).toHaveCount(0)
+      await expectNoSidewaysScroll(page)
+    })
+
     test('refuses an address outside the student domain and sends no code', async ({ page }) => {
       const outsider = `outsider-${Date.now()}@example.com`
-      await openCodeSignIn(page)
-      await page.getByLabel('Student email').fill(outsider)
-      await page.getByRole('button', { name: 'Send code' }).click()
+      await askForSignUpCode(page, outsider)
       await expect(page.getByRole('alert')).toContainText('Use your Swinburne student email, which ends in @student.swin.edu.au.')
       await expect(page.getByLabel('6-digit code')).toHaveCount(0)
       await page.waitForTimeout(1500)
@@ -30,41 +42,32 @@ for (const width of widths) {
       await expectNoSidewaysScroll(page)
     })
 
-    test('signs a new student in with a code, creates the account and asks for a campus', async ({ page }) => {
+    test('signs a new student up with a code and creates the account', async ({ page }) => {
       const email = `e2e-${width.name}-${Date.now()}@student.swin.edu.au`
       try {
-        await openCodeSignIn(page)
-        await page.getByLabel('Student email').fill(email)
-        await page.getByRole('button', { name: 'Send code' }).click()
+        await askForSignUpCode(page, email)
         await expect(page.getByLabel('6-digit code')).toBeVisible()
         await expectNoSidewaysScroll(page)
 
         const code = await emailedCode(email)
         expect(code).toMatch(/^\d{6}$/)
 
+        // Auth answers a wrong code and an expired code with the same refusal.
         const wrong = code === '000000' ? '111111' : '000000'
         await page.getByLabel('6-digit code').fill(wrong)
-        await page.getByRole('button', { name: 'Verify code' }).click()
+        await page.getByRole('button', { name: 'Create account' }).click()
         await expect(page.getByRole('alert')).toContainText('That code is wrong or has expired.')
 
         await page.getByLabel('6-digit code').fill(code)
-        await page.getByRole('button', { name: 'Verify code' }).click()
+        await page.getByRole('button', { name: 'Create account' }).click()
+        await expect(page).toHaveURL(url => url.pathname === '/', { timeout: 60_000 })
 
-        // The account has no campus yet, so the campus step blocks the workspace.
-        const step = page.getByRole('dialog', { name: 'Choose your campus' })
-        await expect(step).toBeVisible({ timeout: 60_000 })
-        await expect(step.getByRole('button', { name: 'Continue' })).toBeDisabled()
-        await expectNoSidewaysScroll(page)
-        await step.getByLabel('Da Nang').check()
-        await step.getByRole('button', { name: 'Continue' }).click()
-        await expect(step).toBeHidden()
-
-        // The profile shows the campus and the new student number; the campus is read-only.
+        // The profile shows the chosen name and campus and the new student number.
         await page.goto('/profile')
         await expect(page.locator('[data-profile-campus]')).toHaveText('Da Nang')
         await expect(page.getByText(/SWB\d{4,}/)).toBeVisible()
         await expect(page.getByLabel('Campus')).toHaveCount(0)
-        await expect(page.getByRole('textbox', { name: 'Display name' })).toHaveValue(email.split('@')[0]!)
+        await expect(page.getByRole('textbox', { name: 'Display name' })).toHaveValue(studentName)
         await expectNoSidewaysScroll(page)
       }
       finally {
@@ -75,9 +78,7 @@ for (const width of widths) {
     test('can ask for a new code', async ({ page }) => {
       const email = `e2e-resend-${width.name}-${Date.now()}@student.swin.edu.au`
       try {
-        await openCodeSignIn(page)
-        await page.getByLabel('Student email').fill(email)
-        await page.getByRole('button', { name: 'Send code' }).click()
+        await askForSignUpCode(page, email)
         await expect(page.getByLabel('6-digit code')).toBeVisible()
         await page.getByRole('button', { name: 'Send a new code' }).click()
         await expect(page.getByRole('status')).toContainText('A new code is on its way.')
@@ -106,10 +107,15 @@ for (const width of widths) {
   })
 }
 
-async function openCodeSignIn(page: Page) {
-  await page.goto('/sign-in')
+async function askForSignUpCode(page: Page, email: string) {
+  await page.goto('/sign-up')
   await waitForApp(page)
-  await page.getByRole('button', { name: 'Student? Sign in with an email code' }).click()
+  await page.getByLabel('Student email').fill(email)
+  await page.getByLabel('Name').fill(studentName)
+  await page.getByLabel('Campus').selectOption('Da Nang')
+  await page.getByLabel('Password', { exact: true }).fill('long-enough-1')
+  await page.getByLabel('Confirm password').fill('long-enough-1')
+  await page.getByRole('button', { name: 'Send code' }).click()
 }
 
 interface MailSummary { ID: string }

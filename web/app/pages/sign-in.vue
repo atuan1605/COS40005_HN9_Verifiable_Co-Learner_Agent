@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { sessionStudentId } from '#shared/student-id'
 import { recordStudentActivity } from '~/activity/record'
-import { isStudentEmail, studentEmailRule } from '#shared/student-email'
 import { staffLanding } from '~/staff/landing'
 import { claimIntro, introAttribute, introHeadScript, introSeenKey, introStart } from '~/sign-in/intro'
 
@@ -10,12 +9,6 @@ const password = ref('')
 const errorMessage = ref('')
 const credentialsRejected = ref(false)
 const pending = ref(false)
-
-// Students sign in with a code emailed to them; staff and seeded students keep the password.
-const mode = ref<'password' | 'code-email' | 'code-entry'>('password')
-const code = ref('')
-const wrongCodeMessage = 'That code is wrong or has expired. Check it, or ask for a new code.'
-const notice = ref('')
 
 const incorrectMessage = 'Email or password is incorrect.'
 const unreachableMessage = 'Sign-in is unavailable right now.'
@@ -144,65 +137,6 @@ async function signIn() {
     pending.value = false
   }
 }
-
-function showMode(next: typeof mode.value) {
-  mode.value = next
-  errorMessage.value = ''
-  notice.value = ''
-  credentialsRejected.value = false
-  code.value = ''
-}
-
-async function sendCode() {
-  errorMessage.value = ''
-  notice.value = ''
-  email.value = email.value.trim()
-  if (!isStudentEmail(email.value)) {
-    errorMessage.value = studentEmailRule
-    return
-  }
-  pending.value = true
-  try {
-    await $fetch('/api/sign-in-code', { method: 'POST', body: { email: email.value } })
-    const resent = mode.value === 'code-entry'
-    mode.value = 'code-entry'
-    code.value = ''
-    notice.value = resent ? 'A new code is on its way.' : ''
-  }
-  catch (error) {
-    errorMessage.value = typeof error === 'object' && error && 'statusMessage' in error && typeof error.statusMessage === 'string' && error.statusMessage
-      ? error.statusMessage
-      : unreachableMessage
-  }
-  finally {
-    pending.value = false
-  }
-}
-
-async function verifyCode() {
-  errorMessage.value = ''
-  notice.value = ''
-  pending.value = true
-  try {
-    const { error } = await useNuxtApp().$supabase.auth.verifyOtp({
-      email: email.value,
-      token: code.value.trim(),
-      type: 'email',
-    })
-    if (error) {
-      errorMessage.value = error.name === 'AuthRetryableFetchError' ? unreachableMessage : wrongCodeMessage
-      return
-    }
-    await recordStudentActivity({ event: 'signed_in' })
-    await navigateTo('/')
-  }
-  catch {
-    errorMessage.value = unreachableMessage
-  }
-  finally {
-    pending.value = false
-  }
-}
 </script>
 
 <template>
@@ -274,7 +208,6 @@ async function verifyCode() {
 
     <main class="phone-safe-bottom flex flex-1 flex-col items-center justify-center p-4 md:p-6">
       <form
-        v-if="mode === 'password'"
         ref="card"
         class="page-enter flex w-full flex-col gap-6 rounded-xl border border-default bg-default p-4 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_16px_40px_-20px_rgb(15_23_42/0.16)] md:max-w-sm md:p-8"
         @submit.prevent="signIn"
@@ -341,112 +274,6 @@ async function verifyCode() {
           >
             Sign in
           </UButton>
-          <button
-            type="button"
-            class="inline-flex min-h-11 items-center justify-center text-sm font-medium text-muted underline-offset-4 hover:text-highlighted hover:underline md:min-h-0"
-            @click="showMode('code-email')"
-          >
-            Student? Sign in with an email code
-          </button>
-        </div>
-      </form>
-      <form
-        v-else
-        ref="card"
-        class="page-enter flex w-full flex-col gap-6 rounded-xl border border-default bg-default p-4 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_16px_40px_-20px_rgb(15_23_42/0.16)] md:max-w-sm md:p-8"
-        @submit.prevent="mode === 'code-email' ? sendCode() : verifyCode()"
-      >
-        <div class="flex flex-col gap-1">
-          <h1 class="text-2xl font-semibold tracking-tight text-highlighted">
-            Student sign-in
-          </h1>
-          <p v-if="mode === 'code-email'" class="text-sm/5 text-muted">
-            Enter your Swinburne student email and we will email you a 6-digit code.
-          </p>
-          <p v-else class="text-sm/5 text-muted">
-            We emailed a 6-digit code to <strong class="font-medium text-default [overflow-wrap:anywhere]">{{ email }}</strong>. It is valid for 5 minutes.
-          </p>
-        </div>
-        <p
-          v-if="errorMessage"
-          role="alert"
-          class="flex items-start gap-2.5 rounded-sm border border-rose-200/80 bg-rose-50 px-[13px] py-[11px] text-xs leading-[19.5px] text-rose-700"
-        >
-          <span class="inline-flex shrink-0 pt-0.5">
-            <img
-              src="/sign-in-error.svg"
-              alt=""
-              width="16"
-              height="16"
-            >
-          </span>
-          {{ errorMessage }}
-        </p>
-        <p
-          v-if="notice"
-          role="status"
-          class="rounded-sm border border-default bg-muted px-[13px] py-[11px] text-xs leading-[19.5px] text-default"
-        >
-          {{ notice }}
-        </p>
-        <div class="flex flex-col gap-4">
-          <label v-if="mode === 'code-email'" class="flex flex-col gap-1.5 pb-2 text-xs font-medium leading-4 text-default">
-            <span>Student email</span>
-            <UInput
-              v-model="email"
-              type="email"
-              name="student-email"
-              autocomplete="email"
-              placeholder="104123456@student.swin.edu.au"
-              required
-              color="neutral"
-              fixed
-              class="w-full"
-              :ui="{ base: inputClass }"
-            />
-          </label>
-          <label v-else class="flex flex-col gap-1.5 pb-2 text-xs font-medium leading-4 text-default">
-            <span>6-digit code</span>
-            <UInput
-              v-model="code"
-              type="text"
-              name="code"
-              inputmode="numeric"
-              autocomplete="one-time-code"
-              maxlength="6"
-              pattern="[0-9]{6}"
-              required
-              color="neutral"
-              fixed
-              class="w-full"
-              :ui="{ base: inputClass }"
-            />
-          </label>
-          <UButton
-            type="submit"
-            block
-            size="lg"
-            :loading="pending"
-            class="min-h-11 rounded-sm bg-accent text-on-accent px-4 py-2.5 text-sm font-medium shadow-xs hover:bg-accent-hover active:bg-accent-hover disabled:bg-accent md:min-h-0"
-          >
-            {{ mode === 'code-email' ? 'Send code' : 'Verify code' }}
-          </UButton>
-          <button
-            v-if="mode === 'code-entry'"
-            type="button"
-            class="inline-flex min-h-11 items-center justify-center text-sm font-medium text-muted underline-offset-4 hover:text-highlighted hover:underline disabled:opacity-50 md:min-h-0"
-            :disabled="pending"
-            @click="sendCode"
-          >
-            Send a new code
-          </button>
-          <button
-            type="button"
-            class="inline-flex min-h-11 items-center justify-center text-sm font-medium text-muted underline-offset-4 hover:text-highlighted hover:underline md:min-h-0"
-            @click="showMode('password')"
-          >
-            Staff? Sign in with a password
-          </button>
         </div>
       </form>
       <NuxtLink

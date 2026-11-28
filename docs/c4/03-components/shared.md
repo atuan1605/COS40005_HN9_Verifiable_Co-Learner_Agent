@@ -57,7 +57,7 @@ flowchart LR
 | File | Responsibility |
 |---|---|
 | `campus.ts` | The four campuses, the `Campus` type and `isCampus`. |
-| `student-email.ts` | The student email domain, its message and `isStudentEmail`, used by the sign-in page and by the sign-in code handler. |
+| `student-email.ts` | The student email domain, its message and `isStudentEmail`, used by the sign-up page and by the sign-in code handler. |
 | `student-id.ts` | `studentIdFromAuth(client)` reads the signed-in user's id from the session claims (`getClaims`). `sessionStudentId(event)` and `sessionEmail(event)` do the same on the server from request cookies and return `null` when Supabase is not configured. Staff routes do not use `sessionEmail`; they read the confirmed email from the user record with the secret key. |
 | `supabase-server.ts` | `createRequestClient(event, url, publishableKey)`: a Supabase server client that reads cookies from the request and writes refreshed ones to the response. |
 | `turn.ts` | The screen state (`RedrawState`), roadmap, working area, conversation, trace and the `TurnEvent` stream; `AddressedAgent`, `RuleCheck`, and the one runtime value `agentNames` (Teacher, Mai), the single agent-to-display-name map. `MaterialBlock` is one materials block: text, code, diagram, image or video. |

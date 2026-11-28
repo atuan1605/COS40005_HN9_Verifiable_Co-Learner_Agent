@@ -32,10 +32,6 @@ test('Home says what is recorded and who can see it; sign-in does not', async ({
   await page.goto('/sign-in')
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
   await expect(page.getByText(recordingNotice)).toHaveCount(0)
-
-  await page.getByRole('button', { name: 'Student? Sign in with an email code' }).click()
-  await expect(page.getByRole('heading', { name: 'Student sign-in' })).toBeVisible()
-  await expect(page.getByText(recordingNotice)).toHaveCount(0)
 })
 
 test('the About page fits every width and its controls are big enough to tap', async ({ page }) => {
