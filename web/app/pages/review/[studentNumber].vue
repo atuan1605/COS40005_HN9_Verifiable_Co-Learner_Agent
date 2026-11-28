@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { StaffReview } from '#shared/staff-review'
 import ConversationList from '~/components/review/ConversationList.vue'
+import LatestActivityTable from '~/components/review/LatestActivityTable.vue'
 import LearningPlanCard from '~/components/review/LearningPlanCard.vue'
 import { isProductOwner } from '~/staff/landing'
 import { timeText } from '~/staff/time-text'
@@ -30,37 +31,6 @@ onMounted(async () => {
 })
 const backTo = computed(() => administrator.value ? '/admin/students' : '/lecturer')
 
-const eventLabels: Record<string, string> = {
-  signed_in: 'Signed in',
-  module_opened: 'Opened a module',
-  mode_switched: 'Switched mode',
-  layout_switched: 'Switched layout',
-  code_run: 'Ran code',
-  run_finished: 'A run finished',
-  pasted: 'Pasted into the editor',
-  went_idle: 'Went quiet',
-  returned: 'Came back',
-  submitted: 'Submitted',
-  quiz_answered: 'Answered a quiz question',
-  message_sent: 'Sent a message',
-  note_created: 'Created a note',
-  note_changed: 'Changed a note',
-  note_linked: 'Linked a note',
-  note_unlinked: 'Unlinked a note',
-  note_deleted: 'Deleted a note',
-  mindmap_moved: 'Moved on the progress map',
-  profile_changed: 'Changed their profile',
-  approach_written: 'Wrote their approach',
-  plan_agreed: 'Agreed to a plan',
-  idle_check_in: 'The Teacher checked in',
-}
-function eventText(type: string): string {
-  return eventLabels[type] ?? type
-}
-function detail(payload: Record<string, unknown>): string {
-  return Object.entries(payload).map(([key, value]) => `${key}: ${String(value)}`).join(', ')
-}
-
 function duration(seconds: number): string {
   const minutes = Math.floor(seconds / 60)
   return minutes === 0 ? `${seconds}s` : `${minutes}m ${seconds % 60}s`
@@ -77,6 +47,9 @@ const signalsPerPage = 5
 const signalPage = ref(1)
 const signalPageCount = computed(() => Math.max(1, Math.ceil((data.value?.signals.length ?? 0) / signalsPerPage)))
 const pagedSignals = computed(() => (data.value?.signals ?? []).slice((signalPage.value - 1) * signalsPerPage, signalPage.value * signalsPerPage))
+
+// A signal's event link turns the activity table to the page holding the event.
+const activityTable = useTemplateRef<InstanceType<typeof LatestActivityTable>>('activityTable')
 </script>
 
 <template>
@@ -146,6 +119,7 @@ const pagedSignals = computed(() => (data.value?.signals ?? []).slice((signalPag
                           v-for="id in signal.eventIds"
                           :key="id"
                           :href="`#event-${id}`"
+                          @click.exact.prevent="activityTable?.show(id)"
                           class="font-medium text-brand-700 underline underline-offset-4"
                         >#{{ id }}</a>
                       </span>
@@ -282,22 +256,7 @@ const pagedSignals = computed(() => (data.value?.signals ?? []).slice((signalPag
 
         <ConversationList :student-number="studentNumber" :conversations="data.conversations" />
 
-        <section aria-labelledby="activity-heading" class="flex flex-col gap-3">
-          <h2 id="activity-heading" class="text-base font-semibold text-highlighted">
-            Latest activity
-          </h2>
-          <p v-if="!data.activity.length" class="text-sm text-muted">
-            No activity yet.
-          </p>
-          <ol v-else class="flex flex-col divide-y divide-default rounded-lg border border-default bg-default text-sm shadow-xs">
-            <li v-for="item in data.activity" :id="`event-${item.id}`" :key="item.id" class="flex flex-wrap gap-x-3 px-3 py-2 target:bg-brand-50">
-              <span class="w-12 font-mono text-xs text-muted">#{{ item.id }}</span>
-              <span class="font-medium text-highlighted">{{ eventText(item.type) }}</span>
-              <span class="text-xs text-muted [overflow-wrap:anywhere]">{{ detail(item.payload) }}</span>
-              <time :datetime="item.time" class="ml-auto text-xs text-muted">{{ timeText(item.time) }}</time>
-            </li>
-          </ol>
-        </section>
+        <LatestActivityTable ref="activityTable" :activity="data.activity" />
       </template>
     </main>
   </div>
