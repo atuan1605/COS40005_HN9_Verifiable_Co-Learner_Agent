@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test'
 import { lecturerAccount } from '../server/auth/demo-accounts'
 import { resetDemoAccounts } from './reset-demo-accounts'
 
-// The lecturer's Overview: the class totals, the two pies and the student cards' table, at desktop
+// The lecturer's Overview: the class totals, the two pies, the students table and the filters over
+// them, at desktop
 // and phone width. From supabase/seed.sql, Bình is at 36% (part way) and, once reset, An is at 0%.
 const widths = [
   { name: 'desktop', viewport: { width: 1440, height: 900 } },
@@ -27,6 +28,17 @@ for (const width of widths) {
     const rows = page.getByTestId('course-students').locator('tbody tr')
     await expect(rows).toHaveCount(2)
     await expect(rows.filter({ hasText: 'binh@example.com' }).getByTestId('student-progress')).toContainText('4/11 · 36%')
+
+    // The filters narrow the totals, both pies and the table together.
+    await page.getByLabel('Course progress', { exact: true }).selectOption('part-way')
+    await expect(page.getByTestId('overview-student-count')).toHaveText('1 of 2 students shown')
+    await expect(rows).toHaveCount(1)
+    await expect(progress.getByRole('listitem').filter({ hasText: 'Not started' })).toContainText('0')
+    await expect(page.getByTestId('enrollment-count')).toContainText('2')
+    await page.getByLabel('Search students').fill('nobody')
+    await expect(page.getByText('No students match these filters.')).toBeVisible()
+    await page.getByRole('button', { name: 'Clear filters' }).click()
+    await expect(rows).toHaveCount(2)
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false)
   })
 }

@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { campuses } from '#shared/campus'
 import type { LecturerCourse, LecturerStudent } from '#shared/lecturer'
 import ModuleRing from '~/components/lecturer/ModuleRing.vue'
 import StudentPortrait from '~/components/lecturer/StudentPortrait.vue'
 
-// A course's enrolled students: searchable, filtered by campus and sorted on the page.
-const props = defineProps<{ course: LecturerCourse }>()
+// A course's enrolled students, sorted on the page.
+const props = defineProps<{
+  course: LecturerCourse
+  // The enrolled students the tab's filters leave.
+  students: LecturerStudent[]
+}>()
 
 const enrolledDate = new Intl.DateTimeFormat('en', {
   dateStyle: 'medium',
@@ -13,8 +16,6 @@ const enrolledDate = new Intl.DateTimeFormat('en', {
 })
 
 type StudentSortKey = 'displayName' | 'studentNumber' | 'enrolledAt'
-const search = ref('')
-const campusChoice = ref('')
 const sort = ref<{ key: StudentSortKey, asc: boolean }>({ key: 'displayName', asc: true })
 
 function toggleSort(key: StudentSortKey) {
@@ -26,14 +27,9 @@ function ariaSort(key: StudentSortKey): 'none' | 'ascending' | 'descending' {
   return sort.value.asc ? 'ascending' : 'descending'
 }
 
-const students = computed<LecturerStudent[]>(() => {
-  const term = (search.value ?? '').trim().toLowerCase()
+const sorted = computed(() => {
   const { key, asc } = sort.value
-  return props.course.students
-    .filter(student => campusChoice.value === '' || student.campus === campusChoice.value)
-    .filter(student => !term
-      || student.displayName.toLowerCase().includes(term)
-      || student.studentNumber.toLowerCase().includes(term))
+  return [...props.students]
     .sort((left, right) => left[key].localeCompare(right[key], 'en', { numeric: true }) * (asc ? 1 : -1))
 })
 
@@ -49,49 +45,21 @@ function enrolledText(value: string): string {
     class="rounded-xl border border-default bg-default p-4 shadow-xs md:p-5"
     data-testid="course-students"
   >
-    <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-      <div>
-        <h3 class="text-sm font-semibold text-highlighted">
-          Enrolled students
-        </h3>
-        <ul class="mt-1 flex gap-3 text-xs text-muted" aria-label="Progress ring colours">
-          <li class="flex items-center gap-1.5"><span class="size-2.5 rounded-xs bg-emerald-700" aria-hidden="true" />Mastered</li>
-          <li class="flex items-center gap-1.5"><span class="size-2.5 rounded-xs bg-brand-500" aria-hidden="true" />Open</li>
-          <li class="flex items-center gap-1.5"><span class="size-2.5 rounded-xs bg-ink-300" aria-hidden="true" />Closed</li>
-        </ul>
-      </div>
-      <div class="flex flex-col gap-3 md:flex-row">
-        <label class="flex w-full flex-col gap-1.5 text-xs font-medium leading-4 text-default md:w-64">
-          <span>Search students</span>
-          <UInput
-            v-model="search"
-            type="search"
-            autocomplete="off"
-            color="neutral"
-            fixed
-            placeholder="Name or student number"
-            class="w-full"
-            :ui="{ base: 'min-h-11 rounded-sm px-[13px] py-[9px] text-base/6 md:min-h-0 md:text-sm/5' }"
-          />
-        </label>
-        <label class="flex w-full flex-col gap-1.5 text-xs font-medium leading-4 text-default md:w-48">
-          <span>Campus</span>
-          <select
-            v-model="campusChoice"
-            aria-label="Campus"
-            class="min-h-11 rounded-sm border border-default bg-default px-3 text-base/6 text-default md:min-h-0 md:py-[9px] md:text-sm/5"
-          >
-            <option value="">All campuses</option>
-            <option v-for="campus in campuses" :key="campus" :value="campus">{{ campus }}</option>
-          </select>
-        </label>
-      </div>
+    <div>
+      <h3 class="text-sm font-semibold text-highlighted">
+        Enrolled students
+      </h3>
+      <ul class="mt-1 flex gap-3 text-xs text-muted" aria-label="Progress ring colours">
+        <li class="flex items-center gap-1.5"><span class="size-2.5 rounded-xs bg-emerald-700" aria-hidden="true" />Mastered</li>
+        <li class="flex items-center gap-1.5"><span class="size-2.5 rounded-xs bg-brand-500" aria-hidden="true" />Open</li>
+        <li class="flex items-center gap-1.5"><span class="size-2.5 rounded-xs bg-ink-300" aria-hidden="true" />Closed</li>
+      </ul>
     </div>
     <p v-if="!course.students.length" class="mt-3 text-sm text-muted">
       No students enrolled yet.
     </p>
     <p v-else-if="!students.length" class="mt-3 text-sm text-muted">
-      No students match.
+      No students match these filters.
     </p>
     <div
       v-else
@@ -129,7 +97,7 @@ function enrolledText(value: string): string {
         </thead>
         <tbody class="max-md:block">
           <tr
-            v-for="student in students"
+            v-for="student in sorted"
             :key="student.studentNumber"
             class="border-t border-default align-top max-md:grid max-md:grid-cols-[1fr_auto] max-md:py-2"
           >

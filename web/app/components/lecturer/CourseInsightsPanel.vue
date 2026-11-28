@@ -1,73 +1,28 @@
 <script setup lang="ts">
-import { campuses } from '#shared/campus'
 import type { LecturerCourse } from '#shared/lecturer'
 import CoursePath from '~/components/lecturer/CoursePath.vue'
 import ProgressGroupsPie from '~/components/lecturer/ProgressGroupsPie.vue'
+import StudentFilters from '~/components/lecturer/StudentFilters.vue'
 import StudentPortrait from '~/components/lecturer/StudentPortrait.vue'
-import { filterStudents, furthestBehind, noFilters, noModuleOpen, studentCountText } from '~/lecturer/course-insights'
-import { classSummary, progressGroupRanges } from '~/lecturer/course-overview'
+import { furthestBehind, studentCountText } from '~/lecturer/course-insights'
+import { classSummary } from '~/lecturer/course-overview'
+import { filterStudents, isFiltering, noFilters } from '~/lecturer/student-filters'
 
 // The Insights tab: Course insights for each owned course, worked out here from the lecturer
 // response. One set of filters applies to the whole tab and sends no request.
 const props = defineProps<{ courses: LecturerCourse[] }>()
 
-const filters = reactive({ ...noFilters })
-const filtering = computed(() => Object.values(filters).some(value => value !== ''))
-// Every module any owned course lists, once each.
-const modules = computed(() => [...new Map(props.courses.flatMap(course => course.modules).map(module => [module.id, module])).values()])
-function clear() {
-  Object.assign(filters, noFilters)
-}
+const filters = ref({ ...noFilters })
+const filtering = computed(() => isFiltering(filters.value))
 const views = computed(() => props.courses.map((course) => {
-  const students = filterStudents(course.modules, course.students, filters)
+  const students = filterStudents(course.modules, course.students, filters.value)
   return { course, students, average: classSummary(students).averagePercent, behind: furthestBehind(students, 5) }
 }))
 </script>
 
 <template>
   <section class="flex flex-col gap-6" aria-label="Insights">
-    <div class="grid items-end gap-3 rounded-xl border border-default bg-default p-4 shadow-xs sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]" role="search" aria-label="Filter students">
-      <label class="flex flex-col gap-1.5 text-xs font-medium leading-4 text-default">
-        <span>Search students</span>
-        <input
-          v-model="filters.search"
-          type="search"
-          autocomplete="off"
-          placeholder="Name or student number"
-          class="min-h-11 rounded-sm border border-default bg-default px-3 text-base/6 font-normal text-default md:min-h-0 md:py-[9px] md:text-sm/5"
-        >
-      </label>
-      <label class="flex flex-col gap-1.5 text-xs font-medium leading-4 text-default">
-        <span>Campus</span>
-        <select v-model="filters.campus" aria-label="Campus" class="min-h-11 rounded-sm border border-default bg-default px-3 text-base/6 font-normal text-default md:min-h-0 md:py-[9px] md:text-sm/5">
-          <option value="">All campuses</option>
-          <option v-for="item in campuses" :key="item" :value="item">{{ item }}</option>
-        </select>
-      </label>
-      <label class="flex flex-col gap-1.5 text-xs font-medium leading-4 text-default">
-        <span>Course progress</span>
-        <select v-model="filters.group" aria-label="Course progress" class="min-h-11 rounded-sm border border-default bg-default px-3 text-base/6 font-normal text-default md:min-h-0 md:py-[9px] md:text-sm/5">
-          <option value="">Any progress</option>
-          <option v-for="item in progressGroupRanges" :key="item.key" :value="item.key">{{ item.label }}</option>
-        </select>
-      </label>
-      <label class="flex flex-col gap-1.5 text-xs font-medium leading-4 text-default">
-        <span>Current module</span>
-        <select v-model="filters.moduleId" aria-label="Current module" class="min-h-11 rounded-sm border border-default bg-default px-3 text-base/6 font-normal text-default md:min-h-0 md:py-[9px] md:text-sm/5">
-          <option value="">Any module</option>
-          <option v-for="module in modules" :key="module.id" :value="module.id">{{ module.name }}</option>
-          <option :value="noModuleOpen">No module open</option>
-        </select>
-      </label>
-      <button
-        type="button"
-        class="min-h-11 rounded-sm border border-default px-4 text-sm font-medium text-highlighted hover:bg-ink-50 disabled:opacity-50 md:min-h-10"
-        :disabled="!filtering"
-        @click="clear"
-      >
-        Clear filters
-      </button>
-    </div>
+    <StudentFilters v-model="filters" :courses="courses" />
 
     <article
       v-for="{ course, students, average, behind } in views"

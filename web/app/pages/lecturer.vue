@@ -5,7 +5,10 @@ import ClassOverview from '~/components/lecturer/ClassOverview.vue'
 import CourseEditor from '~/components/lecturer/CourseEditor.vue'
 import CourseInsightsPanel from '~/components/lecturer/CourseInsightsPanel.vue'
 import CoursePreviewPanel from '~/components/lecturer/CoursePreviewPanel.vue'
+import StudentFilters from '~/components/lecturer/StudentFilters.vue'
 import StudentRoster from '~/components/lecturer/StudentRoster.vue'
+import { studentCountText } from '~/lecturer/course-insights'
+import { filterStudents, isFiltering, noFilters } from '~/lecturer/student-filters'
 
 definePageMeta({ middleware: 'signed-in' })
 useHead({ title: 'Lecturer' })
@@ -27,6 +30,13 @@ const { data, error, status } = await useFetch<LecturerResponse>('/api/lecturer'
 })
 
 const pane = ref<'overview' | 'insights' | 'editor' | 'preview'>('overview')
+
+// The Overview's filters, and each course with the students they leave.
+const overviewFilters = ref({ ...noFilters })
+const overviewCourses = computed(() => (data.value?.courses ?? []).map(course => ({
+  course,
+  students: filterStudents(course.modules, course.students, overviewFilters.value),
+})))
 
 const historyLabels: Record<string, string> = {
   seeded: 'Course seeded',
@@ -143,15 +153,19 @@ const dateTime = new Intl.DateTimeFormat('en', {
       <p v-if="notice" role="status" class="text-sm text-default">{{ notice }}</p>
       <p v-if="saveError" role="alert" class="text-sm text-rose-700">{{ saveError }}</p>
       <CourseInsightsPanel v-if="pane === 'insights' && data?.courses.length" :courses="data.courses" />
+      <StudentFilters v-if="pane === 'overview' && data?.courses.length" v-model="overviewFilters" :courses="data.courses" />
       <section
-        v-for="course in pane === 'overview' ? data?.courses : []"
+        v-for="{ course, students } in pane === 'overview' ? overviewCourses : []"
         :key="course.id"
         class="flex flex-col gap-4"
         :aria-label="course.title"
       >
         <h2 class="text-lg font-semibold text-highlighted">{{ course.title }}</h2>
-        <ClassOverview :course="course" />
-        <StudentRoster :course="course" />
+        <p v-if="isFiltering(overviewFilters)" class="text-sm text-muted" data-testid="overview-student-count">
+          {{ students.length }} of {{ studentCountText(course.students.length) }} shown
+        </p>
+        <ClassOverview :course="course" :students="students" />
+        <StudentRoster :course="course" :students="students" />
         <div class="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_2fr]">
           <form class="rounded-xl border border-default bg-default p-5 shadow-xs" @submit.prevent="saveThreshold(course)">
             <h3 class="text-sm font-semibold text-highlighted">Mastery threshold</h3>

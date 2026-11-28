@@ -113,7 +113,7 @@ for (const width of widths) {
     const list = page.getByTestId('course-students')
     const rows = list.locator('tbody tr')
     await expect(rows).toHaveCount(2)
-    await list.getByLabel('Campus', { exact: true }).selectOption('Can Tho')
+    await page.getByLabel('Campus', { exact: true }).selectOption('Can Tho')
     await expect(rows).toHaveCount(1)
     await expect(rows.first()).toContainText('An')
     await expect(rows.first().getByTestId('student-campus')).toHaveText('Can Tho')
