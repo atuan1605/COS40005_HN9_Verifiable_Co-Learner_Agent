@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import type { StaffReview } from '#shared/staff-review'
+import ConversationList from '~/components/review/ConversationList.vue'
+import CourseProgressSection from '~/components/review/CourseProgressSection.vue'
+import LatestActivityTable from '~/components/review/LatestActivityTable.vue'
+import LearningPlanCard from '~/components/review/LearningPlanCard.vue'
 import { isProductOwner } from '~/staff/landing'
+import { timeText } from '~/staff/time-text'
 
 definePageMeta({ middleware: 'signed-in' })
 
@@ -27,49 +32,11 @@ onMounted(async () => {
 })
 const backTo = computed(() => administrator.value ? '/admin/students' : '/lecturer')
 
-const dateTime = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })
-function timeText(value: string | null): string {
-  return value ? dateTime.format(new Date(value)) : 'Before times were kept'
-}
-
-const eventLabels: Record<string, string> = {
-  signed_in: 'Signed in',
-  module_opened: 'Opened a module',
-  mode_switched: 'Switched mode',
-  layout_switched: 'Switched layout',
-  code_run: 'Ran code',
-  run_finished: 'A run finished',
-  pasted: 'Pasted into the editor',
-  went_idle: 'Went quiet',
-  returned: 'Came back',
-  submitted: 'Submitted',
-  quiz_answered: 'Answered a quiz question',
-  message_sent: 'Sent a message',
-  note_created: 'Created a note',
-  note_changed: 'Changed a note',
-  note_linked: 'Linked a note',
-  note_unlinked: 'Unlinked a note',
-  note_deleted: 'Deleted a note',
-  mindmap_moved: 'Moved on the progress map',
-  profile_changed: 'Changed their profile',
-  approach_written: 'Wrote their approach',
-  plan_agreed: 'Agreed to a plan',
-  idle_check_in: 'The Teacher checked in',
-}
-function eventText(type: string): string {
-  return eventLabels[type] ?? type
-}
-function detail(payload: Record<string, unknown>): string {
-  return Object.entries(payload).map(([key, value]) => `${key}: ${String(value)}`).join(', ')
-}
-
 function duration(seconds: number): string {
   const minutes = Math.floor(seconds / 60)
   return minutes === 0 ? `${seconds}s` : `${minutes}m ${seconds % 60}s`
 }
-const planState = (revision: { agreedAt: string | null }) => revision.agreedAt ? 'Agreed' : 'Proposed'
 
-const authors: Record<string, string> = { student: 'Student', teacher: 'Teacher', deskmate: 'Mai', event: 'System' }
 const outcomes: Record<string, string> = { passed: 'Passed', failed: 'Failed', refused: 'Not checked' }
 const signalTitles: Record<string, string> = {
   large_paste_then_pass: 'A large paste came before a pass',
@@ -81,6 +48,9 @@ const signalsPerPage = 5
 const signalPage = ref(1)
 const signalPageCount = computed(() => Math.max(1, Math.ceil((data.value?.signals.length ?? 0) / signalsPerPage)))
 const pagedSignals = computed(() => (data.value?.signals ?? []).slice((signalPage.value - 1) * signalsPerPage, signalPage.value * signalsPerPage))
+
+// A signal's event link turns the activity table to the page holding the event.
+const activityTable = useTemplateRef<InstanceType<typeof LatestActivityTable>>('activityTable')
 </script>
 
 <template>
@@ -150,6 +120,7 @@ const pagedSignals = computed(() => (data.value?.signals ?? []).slice((signalPag
                           v-for="id in signal.eventIds"
                           :key="id"
                           :href="`#event-${id}`"
+                          @click.exact.prevent="activityTable?.show(id)"
                           class="font-medium text-brand-700 underline underline-offset-4"
                         >#{{ id }}</a>
                       </span>
@@ -170,31 +141,7 @@ const pagedSignals = computed(() => (data.value?.signals ?? []).slice((signalPag
           </template>
         </section>
 
-        <section v-if="data.mastery" aria-labelledby="mastery-heading" class="flex flex-col gap-3" data-testid="review-mastery">
-          <h2 id="mastery-heading" class="text-base font-semibold text-highlighted">
-            Mastery
-          </h2>
-          <ul class="flex flex-col divide-y divide-default rounded-lg border border-default bg-default text-sm shadow-xs">
-            <li v-for="module in data.mastery" :key="module.moduleId" class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
-              <span class="min-w-0 flex-1 text-default">{{ module.name }}</span>
-              <div
-                class="h-1.5 w-24 overflow-hidden rounded-full bg-ink-100"
-                role="progressbar"
-                :aria-label="`${module.name} mastery`"
-                :aria-valuenow="Math.round(module.mastery * 100)"
-                aria-valuemin="0"
-                aria-valuemax="100"
-              >
-                <div class="h-full rounded-full" :class="module.state === 'mastered' ? 'bg-emerald-500' : 'bg-brand-500'" :style="{ width: `${Math.round(module.mastery * 100)}%` }" />
-              </div>
-              <span class="w-10 text-right font-mono text-xs text-ink-700">{{ Math.round(module.mastery * 100) }}%</span>
-              <span
-                class="w-16 text-xs font-medium"
-                :class="module.state === 'mastered' ? 'text-emerald-700' : module.state === 'open' ? 'text-brand-700' : 'text-muted'"
-              >{{ module.state }}</span>
-            </li>
-          </ul>
-        </section>
+        <CourseProgressSection v-if="data.mastery" :mastery="data.mastery" />
 
         <section aria-labelledby="plan-heading" class="flex flex-col gap-3" data-testid="review-plans">
           <h2 id="plan-heading" class="text-base font-semibold text-highlighted">
@@ -203,26 +150,7 @@ const pagedSignals = computed(() => (data.value?.signals ?? []).slice((signalPag
           <p v-if="!data.plans.length" class="text-sm text-muted">
             No plan yet.
           </p>
-          <div v-for="plan in data.plans" :key="plan.moduleId" class="rounded-lg border border-default bg-default p-3 shadow-xs">
-            <h3 class="text-sm font-medium text-highlighted">
-              {{ plan.moduleId }}
-            </h3>
-            <ol class="mt-2 flex flex-col gap-3">
-              <li v-for="revision in plan.revisions" :key="revision.revision" class="text-sm">
-                <p class="flex flex-wrap items-baseline gap-x-3">
-                  <strong class="text-highlighted">Revision {{ revision.revision }}</strong>
-                  <span class="text-muted">{{ planState(revision) }}</span>
-                  <span v-if="revision.trigger" class="text-xs text-muted">Because: {{ revision.trigger }}</span>
-                  <time :datetime="revision.time" class="ml-auto text-xs text-muted">{{ timeText(revision.time) }}</time>
-                </p>
-                <ol class="mt-1 list-decimal pl-5 text-default">
-                  <li v-for="(step, index) in revision.steps" :key="index" class="[overflow-wrap:anywhere]">
-                    {{ step.title }}<span v-if="index === revision.currentStep" class="text-xs text-muted"> (current)</span>
-                  </li>
-                </ol>
-              </li>
-            </ol>
-          </div>
+          <LearningPlanCard v-for="plan in data.plans" :key="plan.moduleId" :plan="plan" />
         </section>
 
         <section aria-labelledby="pattern-heading" class="flex flex-col gap-3" data-testid="review-pattern">
@@ -303,46 +231,9 @@ const pagedSignals = computed(() => (data.value?.signals ?? []).slice((signalPag
           </article>
         </section>
 
-        <section aria-labelledby="conversation-heading" class="flex flex-col gap-3">
-          <h2 id="conversation-heading" class="text-base font-semibold text-highlighted">
-            Conversation
-          </h2>
-          <p v-if="!data.conversations.length" class="text-sm text-muted">
-            No conversation yet.
-          </p>
-          <div v-for="conversation in data.conversations" :key="conversation.moduleId" class="rounded-lg border border-default bg-default p-3 shadow-xs">
-            <h3 class="text-sm font-medium text-highlighted">
-              {{ conversation.moduleId }}
-            </h3>
-            <ol class="mt-2 flex flex-col gap-2">
-              <li v-for="message in conversation.messages" :key="message.id" class="text-sm">
-                <p class="text-xs text-muted">
-                  {{ authors[message.author] }} · <time v-if="message.time" :datetime="message.time">{{ timeText(message.time) }}</time>
-                </p>
-                <p class="whitespace-pre-wrap text-default [overflow-wrap:anywhere]">
-                  {{ message.text }}
-                </p>
-              </li>
-            </ol>
-          </div>
-        </section>
+        <ConversationList :student-number="studentNumber" :conversations="data.conversations" />
 
-        <section aria-labelledby="activity-heading" class="flex flex-col gap-3">
-          <h2 id="activity-heading" class="text-base font-semibold text-highlighted">
-            Latest activity
-          </h2>
-          <p v-if="!data.activity.length" class="text-sm text-muted">
-            No activity yet.
-          </p>
-          <ol v-else class="flex flex-col divide-y divide-default rounded-lg border border-default bg-default text-sm shadow-xs">
-            <li v-for="item in data.activity" :id="`event-${item.id}`" :key="item.id" class="flex flex-wrap gap-x-3 px-3 py-2 target:bg-brand-50">
-              <span class="w-12 font-mono text-xs text-muted">#{{ item.id }}</span>
-              <span class="font-medium text-highlighted">{{ eventText(item.type) }}</span>
-              <span class="text-xs text-muted [overflow-wrap:anywhere]">{{ detail(item.payload) }}</span>
-              <time :datetime="item.time" class="ml-auto text-xs text-muted">{{ timeText(item.time) }}</time>
-            </li>
-          </ol>
-        </section>
+        <LatestActivityTable ref="activityTable" :activity="data.activity" />
       </template>
     </main>
   </div>

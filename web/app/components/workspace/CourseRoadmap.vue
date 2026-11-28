@@ -24,7 +24,6 @@ function onHover(event: PointerEvent, module: RoadmapModule) {
   emit('prefetchModule', module.id)
 }
 
-// Modules listed without content stay out of the total, so 100% is reachable.
 const progressSummary = computed(() => courseProgress(props.modules))
 const thresholdPercent = computed(() => Math.round(props.masteryThreshold * 100))
 

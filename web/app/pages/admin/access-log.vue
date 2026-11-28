@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AdminHeader from '~/components/admin/AdminHeader.vue'
 import type { AdminPayload } from '~/admin/decisions'
+import type { StaffAccessEntry } from '#shared/staff-review'
 
 definePageMeta({ middleware: 'signed-in' })
 useHead({ title: 'Access log' })
@@ -15,7 +16,9 @@ const refused = computed(() => error.value?.statusCode === 403)
 const unavailable = computed(() => Boolean(error.value) && !refused.value)
 
 const dateTime = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })
-const openedLabels: Record<string, string> = { student_review: "A student's work" }
+function openedText(entry: StaffAccessEntry): string {
+  return entry.opened === 'student_conversation' ? `Opened conversation: ${entry.moduleName}` : "A student's work"
+}
 const roleLabels: Record<string, string> = { administrator: 'Administrator', lecturer: 'Lecturer' }
 </script>
 
@@ -75,7 +78,7 @@ const roleLabels: Record<string, string> = { administrator: 'Administrator', lec
                   {{ entry.studentNumber ?? 'Deleted student' }}
                 </td>
                 <td class="px-3 py-3">
-                  {{ openedLabels[entry.opened] ?? entry.opened }}
+                  {{ openedText(entry) }}
                 </td>
               </tr>
             </tbody>

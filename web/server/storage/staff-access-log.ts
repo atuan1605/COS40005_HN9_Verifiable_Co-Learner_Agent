@@ -13,12 +13,17 @@ export interface NewStaffAccess {
   studentId: string
   courseId: string | null
   opened: StaffAccessOpened
+  // Set only for 'student_conversation'.
+  moduleId?: string
 }
+
+// A row as it is kept: the module's name is looked up by whoever shows it.
+export type StaffAccessRow = Omit<StaffAccessEntry, 'moduleName'>
 
 export interface StaffAccessLog {
   record: (access: NewStaffAccess) => Promise<void>
   // Newest first.
-  list: (limit: number) => Promise<StaffAccessEntry[]>
+  list: (limit: number) => Promise<StaffAccessRow[]>
 }
 
 export function createMemoryStaffAccessLog(
@@ -39,6 +44,8 @@ export function createMemoryStaffAccessLog(
         studentId: row.studentId,
         studentNumber: studentNumbers[row.studentId] ?? null,
         opened: row.opened,
+        courseId: row.courseId,
+        moduleId: row.moduleId ?? null,
       })).reverse().slice(0, limit)
     },
   }

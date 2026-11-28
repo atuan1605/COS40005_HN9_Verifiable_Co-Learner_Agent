@@ -5,7 +5,7 @@ import { defaultFailureLimit } from '../learning-plan'
 import type { CourseSpec } from './course-spec'
 import { normaliseCourseSpec } from './materials'
 import { pythonCourseSpec } from './python-course'
-import type { StudyModule } from './study-module'
+import { canonicalModuleId, type StudyModule } from './study-module'
 
 export interface CourseModule {
   id: string
@@ -103,6 +103,12 @@ export const pythonCourse: Course = courseFromSpec(pythonCourseSpec)
 
 export function studyModule(course: Course, id: string): StudyModule | undefined {
   return course.studyModules.find(module => module.id === id)
+}
+
+// The name staff are shown for a module id as a record keeps it, a legacy id included; the id itself
+// when there is no course to name it from or the course no longer lists the module.
+export function moduleName(course: Course | undefined, moduleId: string): string {
+  return course?.modules.find(module => module.id === canonicalModuleId(moduleId))?.name ?? moduleId
 }
 
 export interface RoadmapModule {

@@ -52,6 +52,22 @@ it('keeps the staff access log for the server alone, adds rows and refuses a cha
       values ('owner@example.com', 'administrator', '${an}', 'something_else')
     `)).rejects.toMatchObject({ code: '23514' })
 
+    // An opening of one module's conversation keeps the module; an opening of the review has none.
+    await db.exec(`
+      insert into public.staff_access_log (actor_email, actor_role, student_id, course_id, opened, module_id)
+      values ('owner@example.com', 'administrator', '${an}', 'intro_python', 'student_conversation', 'loops')
+    `)
+    expect((await db.query('select opened, module_id from public.staff_access_log order by id')).rows).toEqual([
+      { opened: 'student_review', module_id: null },
+      { opened: 'student_conversation', module_id: 'loops' },
+    ])
+    for (const [opened, moduleId] of [['student_conversation', 'null'], ['student_review', `'loops'`]]) {
+      await expect(db.exec(`
+        insert into public.staff_access_log (actor_email, actor_role, student_id, opened, module_id)
+        values ('owner@example.com', 'administrator', '${an}', '${opened}', ${moduleId})
+      `)).rejects.toMatchObject({ code: '23514' })
+    }
+
     for (const role of ['authenticated', 'anon']) {
       await db.exec(`reset role; set role ${role}`)
       await expect(db.query('select * from public.staff_access_log')).rejects.toMatchObject({ code: '42501' })
@@ -64,7 +80,7 @@ it('keeps the staff access log for the server alone, adds rows and refuses a cha
     // Deleting a student's records completely leaves the record of who looked.
     await db.exec('reset role; set role service_role')
     await db.exec(`delete from public.students where id = '${an}'`)
-    expect((await db.query('select id from public.staff_access_log')).rows).toHaveLength(1)
+    expect((await db.query('select id from public.staff_access_log')).rows).toHaveLength(2)
   }
   finally {
     await db.close()

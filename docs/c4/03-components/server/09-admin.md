@@ -22,10 +22,12 @@ flowchart LR
   settings["<b>storage/model-settings-store.ts</b>"]:::near
   directory["<b>storage/student-directory.ts</b>"]:::near
   accessLog["<b>storage/staff-access-log.ts</b>"]:::near
+  course["<b>course/index.ts</b>"]:::near
 
   route -->|"handleAdmin, handleConnectionTest,<br/>isRoleCheck, isConnectionTest and error classes"| handle
   handle -->|"resolveModelChoice,<br/>testConnection, UnusableSettingsError"| choice
   handle -->|"verifyShieldEnabled"| shield
+  handle -->|"moduleName"| course
   handle -.->|"type: ConnectionReport, DecisionLogStore"| decisionLog
   handle -.->|"type: ModelSettingsStore"| settings
   handle -.->|"type: StudentDirectoryStore"| directory
@@ -43,13 +45,13 @@ flowchart LR
 | `verifyShield` event | Saves the on or off switch. |
 | `studentNumber` event | Checks the number against `isStudentNumber` in `shared/student-number.ts` (`SWB` + at least four digits, 400 with `studentNumberRule` otherwise) before reading the directory, then asks the store to change the number: an unknown student is 404, a number another student holds or one a student had before is 400. The store writes the change record with the acting administrator's email. |
 | `deleteStudent` event | Asks the student directory to delete the student and every record of theirs (404 if the student is unknown, 400 if `studentId` is missing) and answers with the students who remain. Only an administrator reaches it. The cascade lives in the database function `delete_student_records` ([storage](08-storage.md)). |
-| `staffAccessLog` event | Returns `staffAccess`: the newest 200 openings of a student's records by staff, with who, their role, the student number and when. Only an administrator reaches it (the same 401/403 checks), so a lecturer or a student cannot read the log. Every other call returns it empty and reads nothing. |
+| `staffAccessLog` event | Returns `staffAccess`: the newest 200 openings of a student's records by staff, with who, their role, the student number, what was opened and when; a conversation opening also carries the module's name from the course store (its id when the course no longer lists it). Only an administrator reaches it (the same 401/403 checks), so a lecturer or a student cannot read the log. Every other call returns it empty and reads nothing. |
 | Every other call | Returns the model settings with the API key masked, the current shield state, up to 100 decisions filtered by verdict and student id, and `chain`: `verified` or `broken`. The broken row's id is not in the answer. `students` is empty unless the body's `event` is `students`, `studentNumber`, `campus` or `deleteStudent`, so no other call reads the directory. |
 
 ## Verified imports
 
-- Runtime: `language-model` (`resolveModelChoice`, `modelAddressLocked`, `testConnection`, `UnusableSettingsError`; types `ModelSettings`, `ConnectionReport`), `verify-shield` (`verifyShieldEnabled`; type `VerifyShieldStore`), `shared/student-number` (`isStudentNumber`, `studentNumberRule`).
-- Type only: `storage/decision-log`, `storage/model-settings-store`, `storage/student-directory` (`StudentDirectoryStore`, `AdminStudent`), `storage/staff-access-log` (`StaffAccessLog`), `shared/staff-review` (`StaffAccessEntry`).
+- Runtime: `language-model` (`resolveModelChoice`, `modelAddressLocked`, `testConnection`, `UnusableSettingsError`; types `ModelSettings`, `ConnectionReport`), `verify-shield` (`verifyShieldEnabled`; type `VerifyShieldStore`), `course` (`moduleName`), `shared/student-number` (`isStudentNumber`, `studentNumberRule`).
+- Type only: `storage/decision-log`, `storage/model-settings-store`, `storage/student-directory` (`StudentDirectoryStore`, `AdminStudent`), `storage/staff-access-log` (`StaffAccessLog`, `StaffAccessRow`), `storage/course-store` (`CourseStore`), `shared/staff-review` (`StaffAccessEntry`).
 - It never imports Supabase code; the route passes the stores in, including the student directory.
 - Each decision it returns includes `ruleChecks` when the decision log recorded them.
 - Imported by `api/admin.post.ts`. Tests: `admin-handler.test.ts`, which stubs `fetch` for the connection test so the reported messages are the ones a provider really sends, and which checks that the answer's chain is `verified` or `broken` with no hash and no broken-row id.

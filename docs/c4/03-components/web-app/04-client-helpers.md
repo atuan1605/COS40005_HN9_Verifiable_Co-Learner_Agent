@@ -20,7 +20,13 @@ flowchart LR
   practice["<b>PracticePanel.vue</b>"]:::near
   canvas["<b>MindmapCanvas.vue</b>"]:::near
   chatmd["<b>ChatMarkdown.vue</b>"]:::near
+  chatPanel["<b>ConversationPanel.vue</b>"]:::near
+  convPage["<b>pages/review/conversation.vue</b>"]:::near
   mwlayout["<b>middleware/workspace-layout.ts</b>"]:::near
+  reviewPage["<b>pages/review/[studentNumber].vue</b>"]:::near
+  reviewParts["<b>components/review/</b><br/>ConversationList,<br/>LearningPlanCard"]:::near
+  activityTableC["<b>LatestActivityTable.vue</b>"]:::near
+  insights["<b>components/lecturer/</b><br/>CourseInsightsPanel,<br/>ModuleStatusChart,<br/>CourseProgressHistogram"]:::near
   turnTypes["<b>shared/turn.ts</b>"]:::near
   ls[("<b>localStorage</b>")]:::ext
   cookie[("<b>cookie</b><br/>workspace-layout")]:::ext
@@ -31,8 +37,13 @@ flowchart LR
     arr["<b>mindmap/arrangement.ts</b><br/>Legacy import and canvas maths"]:::comp
     layout["<b>workspace/layout.ts</b><br/>Study and Mindmap layout ids"]:::comp
     md["<b>workspace/chat-markdown.ts</b><br/>parseChatMarkdown"]:::comp
+    messageStyle["<b>workspace/message-style.ts</b><br/>Message classes by author"]:::comp
+    dates["<b>workspace/conversation-dates.ts</b><br/>dateMessages"]:::comp
     intro["<b>sign-in/intro.ts</b><br/>claimIntro, introStart"]:::comp
     record["<b>activity/record.ts</b><br/>recordStudentActivity"]:::comp
+    timeTextH["<b>staff/time-text.ts</b><br/>timeText"]:::comp
+    paging["<b>review/activity-pages.ts</b><br/>activityPage, pageOfEvent"]:::comp
+    courseInsights["<b>lecturer/course-insights.ts</b><br/>Insights chart data"]:::comp
   end
 
   index -->|"createDraftStore"| drafts
@@ -41,11 +52,21 @@ flowchart LR
   index -->|"resolveWorkspaceLayout, ..."| layout
   mwlayout -->|"resolveWorkspaceLayout, ..."| layout
   chatmd -->|"parseChatMarkdown"| md
+  chatPanel -->|"bubbleClass, ..."| messageStyle
+  convPage -->|"bubbleClass, ..."| messageStyle
+  reviewPage -->|"timeText"| timeTextH
+  reviewParts -->|"timeText"| timeTextH
+  activityTableC -->|"timeText"| timeTextH
+  activityTableC -->|"activityPage, pageOfEvent"| paging
+  insights -->|"moduleStatus, progressBands,<br/>studentsAtCampus, studentCountText"| courseInsights
+  chatPanel -->|"dateMessages"| dates
+  convPage -->|"dateMessages"| dates
   signin -->|"claimIntro, introStart, ..."| intro
   index -->|"recordStudentActivity"| record
   signin -->|"recordStudentActivity"| record
   signup -->|"recordStudentActivity"| record
   arr -.->|"type: RoadmapModule"| turnTypes
+  courseInsights -.->|"type: ModuleState"| turnTypes
   drafts -->|"key co-learner-draft:..."| ls
   arr -->|"key co-learner-roadmap-arrangement:..."| ls
   intro -->|"key colearner-sign-in-intro"| ls
@@ -62,14 +83,19 @@ flowchart LR
 | `mindmap/arrangement.ts` | Where each module card sits on the canvas, zoom and pan maths, connectors, collision avoidance, and `readLegacyArrangement`. | Reads the legacy keys by student and size class from `localStorage` for one-time import. The account arrangement lives on the server. |
 | `workspace/layout.ts` | The two layouts (`study`, `mindmap`), the cookie name and options, and `resolveWorkspaceLayout` (query first, then cookie, then `study`). Old values `map` and `roadmap` open Mindmap. `ide` opens Study. | Cookie `workspace-layout`, set by `pages/index.vue`. |
 | `workspace/chat-markdown.ts` | Parses the Markdown subset into a node tree (paragraphs, inline code, bold, italic, lists, fenced code); never produces HTML; tolerant of half-streamed text. A heading in a reply stays bold text. Materials pass `{ headings: true }`, and that tree has a heading node. | None. |
+| `workspace/message-style.ts` | The classes and portraits of a message by author, shared by `ConversationPanel` and the staff conversation page. | None. |
+| `workspace/conversation-dates.ts` | The day separator and time of each message, in a given time zone (the browser's by default). | None. |
+| `staff/time-text.ts` | `timeText`: a record's time as the staff review writes it (UTC), or "Before times were kept". | None. |
+| `review/activity-pages.ts` | Pure paging of the staff review's Latest activity, 20 rows a page, finding an event by its place in the list. | None. |
+| `lecturer/course-insights.ts` | Pure derivation of the Insights chart data from the lecturer response: the campus filter, each module's students per state, the segment widths (an occupied segment keeps a minimum width so it can be pointed at), the students per Course progress band, and the student count in words. | None. |
 | `sign-in/intro.ts` | Decides whether the sign-in intro plays (once per device, never with reduced motion) and computes the starting transform; exports an inline head script. | `localStorage` key `colearner-sign-in-intro`. |
 | `activity/record.ts` | Posts one client report to `POST /api/student`: `signed_in`, `module_opened`, `mode_switched`, `layout_switched`, `code_run`, `run_finished`, `pasted`, `went_idle`, or `returned`. A failure does not undo the action. A finished run reports the exercise id, and separately its outcome and error name. A paste reports the character count. The workspace reports going quiet and coming back. | None. The server keeps the activity log, and no page lists it. |
 
 ## Verified imports
 
-- Imports from this repo: only `mindmap/arrangement.ts` (type `RoadmapModule` from `shared/turn`). The other files import nothing from this repo. `activity/record.ts` calls `$fetch`, which Nuxt provides.
-- Importers: `drafts/store` by `pages/index.vue`, `PracticePanel.vue`, `draft-store.test.ts`; `mindmap/arrangement` by `MindmapCanvas.vue`, `mindmap-arrangement.test.ts`; `workspace/layout` by `pages/index.vue`, `middleware/workspace-layout.ts`; `workspace/chat-markdown` by `ChatMarkdown.vue` and `ChatInline.vue` (type), `chat-markdown.test.ts`; `sign-in/intro` by `pages/sign-in.vue`, `sign-in-intro.test.ts`; `activity/record` by `pages/index.vue`, `pages/sign-in.vue` and `pages/sign-up.vue`.
-- Each file here has a unit test under `web/tests/` except `workspace/layout.ts` and `activity/record.ts`. What the server stores for a report is covered by `student-handler.test.ts`.
+- Imports from this repo: type-only, `mindmap/arrangement.ts` (`RoadmapModule` from `shared/turn`) and `lecturer/course-insights.ts` (`shared/campus`, `shared/lecturer`, `shared/turn`). The other files import nothing from this repo. `activity/record.ts` calls `$fetch`, which Nuxt provides.
+- Importers: `drafts/store` by `pages/index.vue`, `PracticePanel.vue`, `draft-store.test.ts`; `mindmap/arrangement` by `MindmapCanvas.vue`, `mindmap-arrangement.test.ts`; `workspace/layout` by `pages/index.vue`, `middleware/workspace-layout.ts`; `workspace/message-style` and `workspace/conversation-dates` by `ConversationPanel.vue` and `pages/review/conversation.vue`; `workspace/chat-markdown` by `ChatMarkdown.vue` and `ChatInline.vue` (type), `chat-markdown.test.ts`; `sign-in/intro` by `pages/sign-in.vue`, `sign-in-intro.test.ts`; `activity/record` by `pages/index.vue`, `pages/sign-in.vue` and `pages/sign-up.vue`; `staff/time-text` by `pages/review/[studentNumber].vue`, `ConversationList.vue`, `LearningPlanCard.vue` and `LatestActivityTable.vue`; `review/activity-pages` by `LatestActivityTable.vue`, `activity-pages.test.ts`; `lecturer/course-insights` by `CourseInsightsPanel.vue`, `ModuleStatusChart.vue`, `CourseProgressHistogram.vue`, `course-insights.test.ts`.
+- Each file here has a unit test under `web/tests/` except `workspace/layout.ts`, `workspace/message-style.ts`, `staff/time-text.ts` and `activity/record.ts`. What the server stores for a report is covered by `student-handler.test.ts`.
 
 ## Notes
 

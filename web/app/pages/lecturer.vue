@@ -3,6 +3,7 @@ import { campuses } from '#shared/campus'
 import type { LecturerCourse, LecturerResponse, LecturerStudent } from '#shared/lecturer'
 import { isProductOwner } from '~/staff/landing'
 import CourseEditor from '~/components/lecturer/CourseEditor.vue'
+import CourseInsightsPanel from '~/components/lecturer/CourseInsightsPanel.vue'
 import CoursePreviewPanel from '~/components/lecturer/CoursePreviewPanel.vue'
 
 definePageMeta({ middleware: 'signed-in' })
@@ -24,7 +25,7 @@ const { data, error, status } = await useFetch<LecturerResponse>('/api/lecturer'
   getCachedData: () => undefined,
 })
 
-const pane = ref<'overview' | 'editor' | 'preview'>('overview')
+const pane = ref<'overview' | 'insights' | 'editor' | 'preview'>('overview')
 
 const historyLabels: Record<string, string> = {
   seeded: 'Course seeded',
@@ -173,7 +174,7 @@ function enrolledText(value: string): string {
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h1 class="text-xl font-semibold tracking-tight text-highlighted">Lecturer</h1>
         <nav class="flex flex-wrap gap-2" aria-label="Lecturer sections">
-          <button v-for="item in [['overview', 'Overview'], ['editor', 'Editor'], ['preview', 'Preview']] as const" :key="item[0]" type="button" class="min-h-11 rounded-sm px-3 text-sm" :class="pane === item[0] ? 'bg-accent text-on-accent' : 'border border-default'" @click="pane = item[0]">{{ item[1] }}</button>
+          <button v-for="item in [['overview', 'Overview'], ['insights', 'Insights'], ['editor', 'Editor'], ['preview', 'Preview']] as const" :key="item[0]" type="button" class="min-h-11 rounded-sm px-3 text-sm" :class="pane === item[0] ? 'bg-accent text-on-accent' : 'border border-default'" @click="pane = item[0]">{{ item[1] }}</button>
         </nav>
       </div>
       <CourseEditor v-if="pane === 'editor'" course-id="intro_python" />
@@ -185,6 +186,7 @@ function enrolledText(value: string): string {
       <p v-else-if="!data?.courses.length" class="text-sm text-muted">You have no courses.</p>
       <p v-if="notice" role="status" class="text-sm text-default">{{ notice }}</p>
       <p v-if="saveError" role="alert" class="text-sm text-rose-700">{{ saveError }}</p>
+      <CourseInsightsPanel v-if="pane === 'insights' && data?.courses.length" :courses="data.courses" />
       <article
         v-for="course in pane === 'overview' ? data?.courses : []"
         :key="course.id"

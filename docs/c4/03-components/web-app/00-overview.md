@@ -22,7 +22,7 @@ flowchart LR
     pages["<b>pages</b><br/>Sign-in, workspace, About,<br/>admin, lecturer"]:::comp
     ws["<b>workspace components</b><br/>Chat, roadmap, practice,<br/>editor"]:::comp
     home["<b>about components</b><br/>Sample turn,<br/>shield diagram"]:::comp
-    helpers["<b>client helpers</b><br/>Drafts, arrangement, layout,<br/>markdown, intro, activity, staff roles"]:::comp
+    helpers["<b>client helpers</b><br/>Drafts, arrangement, layout,<br/>markdown, intro, activity, staff,<br/>review paging, insights data"]:::comp
     py["<b>python runner</b><br/>Worker client and Pyodide<br/>session"]:::comp
     mw["<b>middleware and plugins</b><br/>Auth guard, staff redirect,<br/>Supabase client, layout cookie"]:::comp
     shared["<b>shared</b><br/>Session helper, turn types"]:::near
@@ -33,11 +33,11 @@ flowchart LR
   cdn["<b>jsDelivr CDN</b>"]:::ext
 
   pages -->|"imports 5 panels"| ws
-  pages -->|"drafts/store, workspace/layout,<br/>sign-in/intro, activity/record,<br/>staff/landing"| helpers
+  pages -->|"drafts/store, workspace/layout,<br/>sign-in/intro, activity/record,<br/>staff/landing, staff/time-text,<br/>review/activity-pages,<br/>lecturer/course-insights,<br/>workspace/message-style,<br/>workspace/conversation-dates"| helpers
   pages -->|"studentIdFromAuth,<br/>sessionStudentId"| shared
   pages ==>|"auto-registered"| home
   pages ==>|"/turn, /api/student, /api/admin,<br/>/api/admin/security-suite,<br/>/api/admin/security-run, /api/lecturer,<br/>/course-outline"| server
-  ws -->|"drafts/store, mindmap/arrangement,<br/>workspace/chat-markdown"| helpers
+  ws -->|"drafts/store, mindmap/arrangement,<br/>workspace/chat-markdown,<br/>workspace/message-style,<br/>workspace/conversation-dates"| helpers
   ws -->|"videoEmbed"| shared
   ws -->|"python/runner, dynamic<br/>python/browser-runner"| py
   mw -->|"workspace/layout, staff/landing"| helpers
@@ -59,7 +59,7 @@ counted with the python runner component in [web-app/05-python-runner.md](05-pyt
 | pages | `web/app/pages/`, `app.vue`, `app.config.ts` | [web-app/01-pages.md](01-pages.md) |
 | workspace components | `web/app/components/workspace/` | [web-app/02-workspace-components.md](02-workspace-components.md) |
 | about components | `web/app/components/home/` | [web-app/03-about-components.md](03-about-components.md) |
-| client helpers | `web/app/drafts/`, `mindmap/`, `workspace/`, `sign-in/`, `activity/`, `staff/` | [web-app/04-client-helpers.md](04-client-helpers.md) |
+| client helpers | `web/app/drafts/`, `mindmap/`, `workspace/`, `sign-in/`, `activity/`, `staff/`, `review/`, `lecturer/` | [web-app/04-client-helpers.md](04-client-helpers.md) |
 | python runner | `web/app/python/` | [web-app/05-python-runner.md](05-python-runner.md) |
 | middleware and plugins | `web/app/middleware/`, `web/app/plugins/` | [web-app/06-middleware-and-plugins.md](06-middleware-and-plugins.md) |
 | shared | `web/shared/` | [shared.md](../shared.md) |

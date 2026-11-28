@@ -59,8 +59,10 @@ flowchart LR
   cyber -->|"injectionCategoryIds,<br/>injectionCategoryLabels"| shared
   cyber -.->|"type: Agents"| agents
   routes -->|"GET /api/lecturer · handleLecturer"| lecturer
-  routes -->|"GET /api/staff/review · handleStaffReview"| staffReview
-  staffReview -->|"defaultCourseId"| course
+  routes -->|"GET /api/staff/review · handleStaffReview<br/>GET /api/staff/conversation · handleStaffConversation"| staffReview
+  staffReview -->|"defaultCourseId, moduleName"| course
+  staffReview -->|"courseProgress"| shared
+  admin -->|"moduleName"| course
   staffReview -.->|"StaffReviewStore, StaffAccessLog"| storage
   routes -->|"handleStudent"| student
   student -->|"isNoteColour"| shared
@@ -138,7 +140,7 @@ flowchart LR
 | storage | verify-shield, student-model, language-model, activity recorder, learning-pattern, learning-plan | `VerifyShieldStore`; `EvidenceStore`, `EvidenceRow`, `TimedObservation`; `ModelSettings`, `ModelSettingsStore`; `ActivityRecorder`; `LearningPattern`; `LearningPlan`, `PlanStep`, `PlanStepKind` |
 | learning-plan | shared | `LearningPlanView`, `LearningPlanStepView` |
 | study-suggestion | activity recorder, course, shared | `ActivityRow`; `Course`; `StudySuggestionAction`, `StudySuggestionView` |
-| admin | storage, language-model, verify-shield | `DecisionLogStore`, `ModelSettingsStore`, `StaffAccessLog`; `ModelSettings`; `VerifyShieldStore` |
+| admin | storage, language-model, verify-shield | `DecisionLogStore`, `ModelSettingsStore`, `StaffAccessLog`, `CourseStore`; `ModelSettings`; `VerifyShieldStore` |
 | cyber-security | agents, sandbox, shared | `Agents`; `Sandbox`; `InjectionSuiteView`, `InjectionAgent`, `InjectionCategoryId`, `InjectionRunEvent`, `InjectionCaseEvent`, `InjectionRunProvider` |
 | staff-review | storage, shared | `StaffReviewStore`, `StaffAccessLog`; `StaffReview` and its parts |
 
