@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { campuses, type Campus } from '#shared/campus'
 import type { LecturerCourse } from '#shared/lecturer'
+import CourseProgressHistogram from '~/components/lecturer/CourseProgressHistogram.vue'
 import ModuleStatusChart from '~/components/lecturer/ModuleStatusChart.vue'
 import { studentsAtCampus } from '~/lecturer/course-insights'
 
@@ -45,6 +46,7 @@ const views = computed(() => props.courses.map(course => ({
           {{ students.length }} {{ students.length === 1 ? 'student' : 'students' }} shown
         </p>
         <ModuleStatusChart :modules="course.modules" :students="students" />
+        <CourseProgressHistogram :students="students" />
       </template>
     </article>
   </section>

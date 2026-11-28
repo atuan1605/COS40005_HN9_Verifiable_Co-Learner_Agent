@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { moduleStatus, studentsAtCampus } from '../app/lecturer/course-insights'
+import { moduleStatus, progressBands, studentsAtCampus } from '../app/lecturer/course-insights'
 import type { LecturerStudent } from '../shared/lecturer'
 import type { ModuleState } from '../shared/turn'
 
@@ -52,5 +52,25 @@ describe('moduleStatus', () => {
   it('reads a module a student has no state for as closed, and draws nothing with no students', () => {
     expect(moduleStatus([{ id: 'new', name: 'New' }], [an])[0]!.segments[2]!.students).toEqual([an])
     expect(moduleStatus(modules, [])[0]!.segments.map(segment => segment.width)).toEqual([0, 0, 0])
+  })
+})
+
+describe('progressBands', () => {
+  const at = (percent: number) => ({ ...student(`SWB2${percent}`, null, {}), progress: { mastered: 0, total: 11, percent } })
+
+  it('counts students in five Course progress bands, each edge in one band only', () => {
+    const bands = progressBands([0, 19, 20, 39, 40, 59, 60, 79, 80, 100].map(at))
+
+    expect(bands.map(band => [band.label, band.students.map(item => item.progress.percent)])).toEqual([
+      ['0–19%', [0, 19]],
+      ['20–39%', [20, 39]],
+      ['40–59%', [40, 59]],
+      ['60–79%', [60, 79]],
+      ['80–100%', [80, 100]],
+    ])
+  })
+
+  it('keeps every band when nobody is in it', () => {
+    expect(progressBands([]).map(band => band.students.length)).toEqual([0, 0, 0, 0, 0])
   })
 })

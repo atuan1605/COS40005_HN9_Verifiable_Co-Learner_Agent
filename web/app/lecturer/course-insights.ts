@@ -49,6 +49,22 @@ export function moduleStatus(modules: LecturerCourse['modules'], students: reado
   })
 }
 
+// Bands of whole percentage points, as Course progress is, so each student falls in exactly one.
+const progressRanges = [[0, 19], [20, 39], [40, 59], [60, 79], [80, 100]] as const
+
+export interface ProgressBand {
+  label: string
+  students: LecturerStudent[]
+}
+
+// The Course progress distribution: always every band, lowest first.
+export function progressBands(students: readonly LecturerStudent[]): ProgressBand[] {
+  return progressRanges.map(([from, to]) => ({
+    label: `${from}–${to}%`,
+    students: students.filter(({ progress }) => progress.percent >= from && progress.percent <= to),
+  }))
+}
+
 // Widths by share, except that an occupied segment never drops below the smallest width: what it
 // gains is taken from the others in proportion.
 function segmentWidths(counts: readonly number[]): number[] {
