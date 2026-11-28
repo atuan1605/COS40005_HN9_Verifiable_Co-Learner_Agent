@@ -289,11 +289,28 @@ describe('the mastery a review shows', () => {
   it('shows the owning lecturer the stored mastery and state of each module', async () => {
     const review = await open('lecturer@example.com', 'SWB0001').result
 
-    expect(review.mastery?.slice(0, 3)).toEqual([
+    expect(review.mastery?.modules.slice(0, 3)).toEqual([
       { moduleId: 'getting_started', name: expect.any(String), mastery: 0.97, state: 'mastered' },
       { moduleId: 'variables', name: expect.any(String), mastery: 0.4, state: 'open' },
       { moduleId: 'strings', name: expect.any(String), mastery: 0, state: 'closed' },
     ])
+  })
+
+  it('gives the owning lecturer Course progress over every module the course lists', async () => {
+    const review = await open('lecturer@example.com', 'SWB0001').result
+
+    // One module mastered of the eleven the Python course lists, the ones without content included.
+    expect(review.mastery?.progress).toEqual({ mastered: 1, total: 11, percent: 9 })
+    expect(review.mastery?.modules).toHaveLength(11)
+  })
+
+  it('shows a module listed without content as closed', async () => {
+    const review = await open('lecturer@example.com', 'SWB0001').result
+    const without = pythonCourse.modules.filter(module => !pythonCourse.studyModules.some(study => study.id === module.id))
+
+    expect(without.length).toBeGreaterThan(0)
+    expect(review.mastery?.modules.filter(module => without.some(other => other.id === module.moduleId)).map(module => module.state))
+      .toEqual(without.map(() => 'closed'))
   })
 
   it('still writes the staff access log when the lecturer reads mastery', async () => {
@@ -308,7 +325,7 @@ describe('the mastery a review shows', () => {
 
   it('opens a module whose unlock was recorded, as the student\'s roadmap does', async () => {
     const review = await open('lecturer@example.com', 'SWB0001', setup({ unlocks: { 'an-id': ['strings'] } })).result
-    expect(review.mastery?.find(module => module.moduleId === 'strings')?.state).toBe('open')
+    expect(review.mastery?.modules.find(module => module.moduleId === 'strings')?.state).toBe('open')
   })
 
   it('rebuilds missing mastery rows from evidence instead of reading them as zero', async () => {
@@ -321,8 +338,8 @@ describe('the mastery a review shows', () => {
       courses: createMemoryCourseStore(), patternSources: () => ({ submissions: parts.submissions, evidence }),
     })
     // Rebuilt from the passing submission: above the prior, and the exercise counts as passed.
-    expect(review.mastery?.[0]?.mastery).toBeGreaterThan(learningParameters.prior)
-    expect(review.mastery?.[1]?.mastery).toBe(learningParameters.prior)
+    expect(review.mastery?.modules[0]?.mastery).toBeGreaterThan(learningParameters.prior)
+    expect(review.mastery?.modules[1]?.mastery).toBe(learningParameters.prior)
   })
 
   it('shows mastery to an administrator who also owns the student\'s course', async () => {
@@ -330,10 +347,10 @@ describe('the mastery a review shows', () => {
     const review = await handleStaffReview({
       email: 'lecturer@example.com', adminEmails: 'lecturer@example.com', lecturerEmails, studentNumber: 'SWB0001', store: parts.store, accessLog: parts.accessLog, ...reading(parts.submissions),
     })
-    expect(review.mastery?.[0]).toMatchObject({ moduleId: 'getting_started', state: 'mastered' })
+    expect(review.mastery?.modules[0]).toMatchObject({ moduleId: 'getting_started', state: 'mastered' })
   })
 
-  it('hands the administrator no mastery', async () => {
+  it('hands the administrator no mastery and no Course progress', async () => {
     const review = await open('owner@example.com', 'SWB0001').result
     expect(review).not.toHaveProperty('mastery')
   })

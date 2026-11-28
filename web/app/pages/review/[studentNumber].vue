@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { StaffReview } from '#shared/staff-review'
 import ConversationList from '~/components/review/ConversationList.vue'
+import CourseProgressSection from '~/components/review/CourseProgressSection.vue'
 import LatestActivityTable from '~/components/review/LatestActivityTable.vue'
 import LearningPlanCard from '~/components/review/LearningPlanCard.vue'
 import { isProductOwner } from '~/staff/landing'
@@ -140,31 +141,7 @@ const activityTable = useTemplateRef<InstanceType<typeof LatestActivityTable>>('
           </template>
         </section>
 
-        <section v-if="data.mastery" aria-labelledby="mastery-heading" class="flex flex-col gap-3" data-testid="review-mastery">
-          <h2 id="mastery-heading" class="text-base font-semibold text-highlighted">
-            Mastery
-          </h2>
-          <ul class="flex flex-col divide-y divide-default rounded-lg border border-default bg-default text-sm shadow-xs">
-            <li v-for="module in data.mastery" :key="module.moduleId" class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
-              <span class="min-w-0 flex-1 text-default">{{ module.name }}</span>
-              <div
-                class="h-1.5 w-24 overflow-hidden rounded-full bg-ink-100"
-                role="progressbar"
-                :aria-label="`${module.name} mastery`"
-                :aria-valuenow="Math.round(module.mastery * 100)"
-                aria-valuemin="0"
-                aria-valuemax="100"
-              >
-                <div class="h-full rounded-full" :class="module.state === 'mastered' ? 'bg-emerald-500' : 'bg-brand-500'" :style="{ width: `${Math.round(module.mastery * 100)}%` }" />
-              </div>
-              <span class="w-10 text-right font-mono text-xs text-ink-700">{{ Math.round(module.mastery * 100) }}%</span>
-              <span
-                class="w-16 text-xs font-medium"
-                :class="module.state === 'mastered' ? 'text-emerald-700' : module.state === 'open' ? 'text-brand-700' : 'text-muted'"
-              >{{ module.state }}</span>
-            </li>
-          </ul>
-        </section>
+        <CourseProgressSection v-if="data.mastery" :mastery="data.mastery" />
 
         <section aria-labelledby="plan-heading" class="flex flex-col gap-3" data-testid="review-plans">
           <h2 id="plan-heading" class="text-base font-semibold text-highlighted">

@@ -1,4 +1,5 @@
 import type { Campus } from './campus'
+import type { CourseProgress } from './course-progress'
 import type { ModuleState, PracticeTestResult } from './turn'
 
 // What the staff review page shows about one student. Staff read it; a student
@@ -112,6 +113,13 @@ export interface ReviewModuleMastery {
   state: ModuleState
 }
 
+// The Course progress section: the student's progress over every module the course lists, and each module's mastery.
+export interface ReviewMastery {
+  progress: CourseProgress
+  // In course order.
+  modules: ReviewModuleMastery[]
+}
+
 export interface StaffReview {
   student: ReviewedStudent
   courseId: string
@@ -123,8 +131,8 @@ export interface StaffReview {
   signals: ReviewSignal[]
   plans: ReviewPlan[]
   learningPattern: ReviewLearningPattern
-  // Each module's mastery, for the owning lecturer only; an administrator's review has none (ADR 0013).
-  mastery?: ReviewModuleMastery[]
+  // For the owning lecturer only; an administrator's review has none (ADR 0013).
+  mastery?: ReviewMastery
 }
 
 export interface StaffAccessEntry {

@@ -1,4 +1,5 @@
-import type { ReviewEvent, ReviewModuleMastery, ReviewPlan, StaffReview } from '../../shared/staff-review'
+import { courseProgress } from '../../shared/course-progress'
+import type { ReviewEvent, ReviewMastery, ReviewPlan, StaffReview } from '../../shared/staff-review'
 import { moduleStandings, needsEvidence, type TimedObservation } from '../student-model'
 import type { StaffAccessLog } from '../storage/staff-access-log'
 import type { StaffReviewStore } from '../storage/staff-review-store'
@@ -53,9 +54,9 @@ export async function handleStaffReview(request: StaffReviewRequest): Promise<St
   }
 }
 
-// Each module of the course with its stored mastery and the state the student's roadmap shows it in.
-// Missing rows are rebuilt from evidence and recorded unlocks count, so the numbers match the roadmap.
-async function reviewMastery(request: StaffReviewRequest, studentId: string, courseId: string, course: Course): Promise<ReviewModuleMastery[]> {
+// The student's Course progress, and each module of the course with its stored mastery and the state the
+// student's roadmap shows it in. Missing rows are rebuilt from evidence and recorded unlocks count, so the numbers match the roadmap.
+async function reviewMastery(request: StaffReviewRequest, studentId: string, courseId: string, course: Course): Promise<ReviewMastery> {
   const [stored, recordedUnlocks] = await Promise.all([
     request.store.masteries(studentId, courseId),
     request.store.unlocks(studentId, courseId),
@@ -64,12 +65,15 @@ async function reviewMastery(request: StaffReviewRequest, studentId: string, cou
     ? await request.patternSources(courseId).evidence?.forStudent(studentId) ?? []
     : []
   const standings = moduleStandings(course, { stored, evidence, recordedUnlocks })
-  return course.modules.map((module, index) => ({
-    moduleId: module.id,
-    name: module.name,
-    mastery: standings[index]!.mastery,
-    state: standings[index]!.state,
-  }))
+  return {
+    progress: courseProgress(standings),
+    modules: course.modules.map((module, index) => ({
+      moduleId: module.id,
+      name: module.name,
+      mastery: standings[index]!.mastery,
+      state: standings[index]!.state,
+    })),
+  }
 }
 
 // The plans by module, named, every revision of each, oldest first, with each step in words.
