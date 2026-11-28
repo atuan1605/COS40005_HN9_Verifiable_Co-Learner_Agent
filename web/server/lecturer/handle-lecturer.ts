@@ -85,7 +85,7 @@ async function withProgress(
       const standings = moduleStandings(studied, { stored: masteries, evidence: observations, recordedUnlocks: unlocks })
       return {
         ...student,
-        progress: courseProgress(studied.modules.map((module, index) => ({ available: module.available, state: standings[index]!.state }))),
+        progress: courseProgress(standings),
         moduleStates: Object.fromEntries(standings.map(({ moduleId, state }) => [moduleId, state])),
       }
     })),

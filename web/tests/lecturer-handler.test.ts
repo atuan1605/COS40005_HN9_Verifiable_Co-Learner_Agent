@@ -58,7 +58,7 @@ describe('lecturer handler', () => {
         modules: pythonCourse.modules.map(({ id, name }) => ({ id, name })),
         students: students.map(student => ({
           ...student,
-          progress: { mastered: 0, total: pythonCourse.modules.filter(module => module.available).length, percent: 0 },
+          progress: { mastered: 0, total: 11, percent: 0 },
           // A student with no evidence yet has only the first module open.
           moduleStates: Object.fromEntries(pythonCourse.modules.map((module, index) => [module.id, index === 0 ? 'open' : 'closed'])),
         })),
@@ -87,7 +87,7 @@ describe('lecturer handler', () => {
 
   // Each passed exercise is one observation, so a module gets enough distinct exercises to be mastered.
   const exercisesOf = (moduleId: string) => Array.from({ length: 12 }, (_, index) => `${moduleId}_ex${index}`)
-  // Three modules have content; the fourth is listed without content and never counts.
+  // Three modules have content; the fourth is listed without content and still counts.
   const small = (extra: Partial<Course> = {}): Course => ({
     ...pythonCourse,
     modules: ['m1', 'm2', 'm3', 'm4'].map((id, index) => ({
@@ -127,7 +127,7 @@ describe('lecturer handler', () => {
       evidence: ledger({ 'an-id': passes('m1', 12) }),
     })
 
-    expect(response.courses[0]!.students[0]!.progress).toEqual({ mastered: 1, total: 3, percent: 33 })
+    expect(response.courses[0]!.students[0]!.progress).toEqual({ mastered: 1, total: 4, percent: 25 })
   })
 
   it('keeps the unlocks the earlier threshold gave, as the roadmap does', async () => {
@@ -174,8 +174,8 @@ describe('lecturer handler', () => {
 
     expect(response.courses.map(course => course.id)).toEqual(['intro_python'])
     expect(response.courses[0]!.students.map(student => [student.email, student.progress])).toEqual([
-      ['an@example.com', { mastered: 2, total: 3, percent: 66 }],
-      ['binh@example.com', { mastered: 0, total: 3, percent: 0 }],
+      ['an@example.com', { mastered: 2, total: 4, percent: 50 }],
+      ['binh@example.com', { mastered: 0, total: 4, percent: 0 }],
     ])
     expect(JSON.stringify(response)).not.toContain('masteries')
     expect(JSON.stringify(response)).not.toContain('else@example.com')
