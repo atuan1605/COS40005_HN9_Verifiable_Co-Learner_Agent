@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { lecturerAccount } from '../server/auth/demo-accounts'
 import { resetDemoAccounts } from './reset-demo-accounts'
 
-// The lecturer's Insights tab: the course path, the Course progress pie, the students furthest
+// The lecturer's Insights tab: the course path's module strip and student list, the Course progress pie, the students furthest
 // behind, the filters they share and the way through to a staff review, at desktop and phone
 // width. The demo students start at the Hanoi campus.
 //
@@ -32,10 +32,20 @@ for (const width of widths) {
     await expect(page.getByLabel('Campus')).toHaveValue('')
 
     const path = insights.getByTestId('course-path')
-    const first = path.getByRole('listitem', { name: `${firstModule}: 1 student working here, 1 mastered it`, exact: true })
-    await expect(first.getByRole('link', { name: /^Review An's work/ })).toBeVisible()
-    await expect(path.getByRole('listitem', { name: /: 1 student working here, 0 mastered it$/ }).getByRole('link', { name: /^Review Bình's work/ })).toBeVisible()
-    await expect(path.getByRole('listitem', { name: 'No module open: 0 students', exact: true })).toBeVisible()
+    const strip = path.getByRole('group', { name: 'Modules' })
+    const first = strip.getByRole('button', { name: `${firstModule}: 1 student working here`, exact: true })
+    await first.click()
+    await expect(first).toHaveAttribute('aria-pressed', 'true')
+    await expect(path.getByRole('heading', { name: `1. ${firstModule}` })).toBeVisible()
+    await expect(path.getByText('1 working here, 1 mastered it')).toBeVisible()
+    await expect(path.getByRole('link', { name: "Review An's work", exact: true })).toBeVisible()
+    // Bình stands on the fifth module, which nobody has mastered.
+    await strip.getByRole('button', { name: /: 1 student working here$/ }).nth(1).click()
+    await expect(path.getByText('1 working here, 0 mastered it')).toBeVisible()
+    await expect(path.getByRole('link', { name: "Review Bình's work", exact: true })).toBeVisible()
+    await expect(strip.getByRole('button', { name: 'No module open: 0 students', exact: true })).toBeVisible()
+    // Two students need no pages.
+    await expect(path.getByRole('navigation', { name: 'Pages of students' })).toHaveCount(0)
 
     const pie = insights.getByTestId('progress-pie')
     await expect(pie.getByRole('listitem').filter({ hasText: 'Not started' })).toContainText('1')
