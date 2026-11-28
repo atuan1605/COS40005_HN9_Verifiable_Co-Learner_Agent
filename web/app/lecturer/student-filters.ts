@@ -39,3 +39,13 @@ export function filterStudents(
 export function isFiltering(filters: StudentFilterValues): boolean {
   return Object.values(filters).some(value => value !== '')
 }
+
+// The progress pie highlights the chosen Course progress group instead of narrowing to it, so it
+// counts the students the other filters leave.
+export function progressPieStudents(
+  modules: LecturerCourse['modules'],
+  students: readonly LecturerStudent[],
+  filters: StudentFilterValues,
+): LecturerStudent[] {
+  return filterStudents(modules, students, { ...filters, group: '' })
+}

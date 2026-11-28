@@ -6,7 +6,7 @@ import StudentFilters from '~/components/lecturer/StudentFilters.vue'
 import StudentPortrait from '~/components/lecturer/StudentPortrait.vue'
 import { furthestBehind, studentCountText } from '~/lecturer/course-insights'
 import { classSummary } from '~/lecturer/course-overview'
-import { filterStudents, isFiltering, noFilters } from '~/lecturer/student-filters'
+import { filterStudents, isFiltering, noFilters, progressPieStudents } from '~/lecturer/student-filters'
 
 // The Insights tab: Course insights for each owned course, worked out here from the lecturer
 // response. One set of filters applies to the whole tab and sends no request.
@@ -16,7 +16,8 @@ const filters = ref({ ...noFilters })
 const filtering = computed(() => isFiltering(filters.value))
 const views = computed(() => props.courses.map((course) => {
   const students = filterStudents(course.modules, course.students, filters.value)
-  return { course, students, average: classSummary(students).averagePercent, behind: furthestBehind(students, 5) }
+  const pieStudents = progressPieStudents(course.modules, course.students, filters.value)
+  return { course, students, pieStudents, average: classSummary(students).averagePercent, behind: furthestBehind(students, 5) }
 }))
 </script>
 
@@ -25,7 +26,7 @@ const views = computed(() => props.courses.map((course) => {
     <StudentFilters v-model="filters" :courses="courses" />
 
     <article
-      v-for="{ course, students, average, behind } in views"
+      v-for="{ course, students, pieStudents, average, behind } in views"
       :key="course.id"
       class="flex flex-col gap-4"
       :aria-label="`Course insights for ${course.title}`"
@@ -46,7 +47,7 @@ const views = computed(() => props.courses.map((course) => {
             <section class="rounded-xl border border-default bg-default p-4 shadow-xs md:p-5" data-testid="progress-pie">
               <h4 class="text-sm font-semibold text-highlighted">Course progress</h4>
               <p class="mb-3 text-sm text-muted">Average {{ average }}%</p>
-              <ProgressGroupsPie :students="students" />
+              <ProgressGroupsPie :students="pieStudents" :highlight="filters.group" />
             </section>
             <section class="rounded-xl border border-default bg-default p-4 shadow-xs md:p-5" data-testid="furthest-behind">
               <h4 class="mb-2 text-sm font-semibold text-highlighted">Furthest behind</h4>

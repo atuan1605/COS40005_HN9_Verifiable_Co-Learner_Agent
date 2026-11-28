@@ -8,7 +8,7 @@ import CoursePreviewPanel from '~/components/lecturer/CoursePreviewPanel.vue'
 import StudentFilters from '~/components/lecturer/StudentFilters.vue'
 import StudentRoster from '~/components/lecturer/StudentRoster.vue'
 import { studentCountText } from '~/lecturer/course-insights'
-import { filterStudents, isFiltering, noFilters } from '~/lecturer/student-filters'
+import { filterStudents, isFiltering, noFilters, progressPieStudents } from '~/lecturer/student-filters'
 
 definePageMeta({ middleware: 'signed-in' })
 useHead({ title: 'Lecturer' })
@@ -36,6 +36,7 @@ const overviewFilters = ref({ ...noFilters })
 const overviewCourses = computed(() => (data.value?.courses ?? []).map(course => ({
   course,
   students: filterStudents(course.modules, course.students, overviewFilters.value),
+  pieStudents: progressPieStudents(course.modules, course.students, overviewFilters.value),
 })))
 
 const historyLabels: Record<string, string> = {
@@ -155,7 +156,7 @@ const dateTime = new Intl.DateTimeFormat('en', {
       <CourseInsightsPanel v-if="pane === 'insights' && data?.courses.length" :courses="data.courses" />
       <StudentFilters v-if="pane === 'overview' && data?.courses.length" v-model="overviewFilters" :courses="data.courses" />
       <section
-        v-for="{ course, students } in pane === 'overview' ? overviewCourses : []"
+        v-for="{ course, students, pieStudents } in pane === 'overview' ? overviewCourses : []"
         :key="course.id"
         class="flex flex-col gap-4"
         :aria-label="course.title"
@@ -164,7 +165,7 @@ const dateTime = new Intl.DateTimeFormat('en', {
         <p v-if="isFiltering(overviewFilters)" class="text-sm text-muted" data-testid="overview-student-count">
           {{ students.length }} of {{ studentCountText(course.students.length) }} shown
         </p>
-        <ClassOverview :course="course" :students="students" />
+        <ClassOverview :course="course" :students="students" :pie-students="pieStudents" :group="overviewFilters.group" />
         <StudentRoster :course="course" :students="students" />
         <div class="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_2fr]">
           <form class="rounded-xl border border-default bg-default p-5 shadow-xs" @submit.prevent="saveThreshold(course)">

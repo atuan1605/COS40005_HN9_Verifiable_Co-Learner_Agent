@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filterStudents, noFilters, noModuleOpen, type StudentFilterValues } from '../app/lecturer/student-filters'
+import { filterStudents, noFilters, noModuleOpen, progressPieStudents, type StudentFilterValues } from '../app/lecturer/student-filters'
 import type { LecturerStudent } from '../shared/lecturer'
 import type { ModuleState } from '../shared/turn'
 
@@ -48,5 +48,19 @@ describe('filterStudents', () => {
   it('applies every filter that is set together', () => {
     expect(names({ group: 'part-way', moduleId: noModuleOpen })).toEqual(['Chi'])
     expect(names({ group: 'not-started', campus: 'Can Tho' })).toEqual([])
+  })
+})
+
+describe('the students the progress pie counts', () => {
+  const all = [an, binh, chi]
+
+  it('ignores the Course progress filter, so the chosen group keeps the others to stand against', () => {
+    const shown = progressPieStudents(modules, all, { ...noFilters, group: 'not-started' })
+    expect(shown.map(one => one.displayName)).toEqual(['An', 'Binh', 'Chi'])
+  })
+
+  it('still applies every other filter', () => {
+    const shown = progressPieStudents(modules, all, { ...noFilters, group: 'not-started', campus: 'Can Tho' })
+    expect(shown.map(one => one.displayName)).toEqual(['Binh'])
   })
 })

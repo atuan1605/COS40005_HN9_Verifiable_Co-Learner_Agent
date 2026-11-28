@@ -2,11 +2,17 @@
 import type { LecturerCourse, LecturerStudent } from '#shared/lecturer'
 import PieChart from '~/components/lecturer/PieChart.vue'
 import ProgressGroupsPie from '~/components/lecturer/ProgressGroupsPie.vue'
-import { classSummary, moduleStateTotals } from '~/lecturer/course-overview'
+import { classSummary, moduleStateTotals, type ProgressGroupKey } from '~/lecturer/course-overview'
 
 // The top of a course's Overview: the totals and two pies of the students shown. The enrollment
 // count is always of the whole class.
-const props = defineProps<{ course: LecturerCourse, students: LecturerStudent[] }>()
+const props = defineProps<{
+  course: LecturerCourse
+  students: LecturerStudent[]
+  // What the progress pie counts, with the chosen group highlighted in it.
+  pieStudents: LecturerStudent[]
+  group: ProgressGroupKey | ''
+}>()
 
 const stateColours = {
   mastered: { label: 'Mastered', fill: 'fill-emerald-700', swatch: 'bg-emerald-700' },
@@ -37,7 +43,7 @@ const stateSlices = computed(() => moduleStateTotals(props.course.modules, props
     </section>
     <section class="rounded-xl border border-default bg-default p-5 shadow-xs">
       <h3 class="mb-3 text-sm font-semibold text-highlighted">Where students are</h3>
-      <ProgressGroupsPie :students="students" />
+      <ProgressGroupsPie :students="pieStudents" :highlight="group" />
     </section>
     <section class="rounded-xl border border-default bg-default p-5 shadow-xs">
       <h3 class="mb-3 text-sm font-semibold text-highlighted">Modules across the class</h3>

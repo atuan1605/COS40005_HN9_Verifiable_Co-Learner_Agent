@@ -66,7 +66,7 @@ flowchart LR
   courseInsights -->|"moduleStateOf"| courseOverview
   insights -->|"coursePath, furthestBehind,<br/>studentCountText"| courseInsights
   insights -->|"classSummary"| courseOverview
-  filterParts -->|"filterStudents, noFilters"| studentFilters
+  filterParts -->|"filterStudents, noFilters,<br/>progressPieStudents"| studentFilters
   studentFilters -->|"moduleStateOf,<br/>progressGroupOf"| courseOverview
   courseInsights -->|"currentModule"| studentFilters
   chatPanel -->|"dateMessages"| dates
@@ -98,7 +98,7 @@ flowchart LR
 | `staff/time-text.ts` | `timeText`: a record's time as the staff review writes it (UTC), or "Before times were kept". | None. |
 | `review/activity-pages.ts` | Pure paging of the staff review's Latest activity, 20 rows a page, finding an event by its place in the list. | None. |
 | `lecturer/course-overview.ts` | Pure derivation for the lecturer Overview: class totals, the Course progress groups, a student's state for one module, module states totalled by state, and the SVG path of a pie slice or ring segment. Imported by `ClassOverview.vue`, `ProgressGroupsPie.vue`, `PieChart.vue`, `ModuleRing.vue`, `CourseInsightsPanel.vue`, `lecturer/course-insights.ts` and `tests/course-overview.test.ts`. |
-| `lecturer/student-filters.ts` | The filters the Overview and Insights tabs share: search, campus, Course progress group and current module (the first module open to a student, or none), applied together on the page. Imported by `StudentFilters.vue`, `CourseInsightsPanel.vue`, `pages/lecturer.vue`, `lecturer/course-insights.ts` and `tests/student-filters.test.ts`. | None. |
+| `lecturer/student-filters.ts` | The filters the Overview and Insights tabs share: search, campus, Course progress group and current module (the first module open to a student, or none), applied together on the page, and the students the progress pie counts (every filter but Course progress). Imported by `StudentFilters.vue`, `CourseInsightsPanel.vue`, `pages/lecturer.vue`, `lecturer/course-insights.ts` and `tests/student-filters.test.ts`. | None. |
 | `lecturer/course-insights.ts` | Pure derivation of the Insights figures from the lecturer response: the course path (who is working on each module, who has none open), the students furthest behind, and the student count in words. | None. |
 | `sign-in/intro.ts` | Decides whether the sign-in intro plays (once per device, never with reduced motion) and computes the starting transform; exports an inline head script. | `localStorage` key `colearner-sign-in-intro`. |
 | `activity/record.ts` | Posts one client report to `POST /api/student`: `signed_in`, `module_opened`, `mode_switched`, `layout_switched`, `code_run`, `run_finished`, `pasted`, `went_idle`, or `returned`. A failure does not undo the action. A finished run reports the exercise id, and separately its outcome and error name. A paste reports the character count. The workspace reports going quiet and coming back. | None. The server keeps the activity log, and no page lists it. |

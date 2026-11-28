@@ -29,11 +29,13 @@ for (const width of widths) {
     await expect(rows).toHaveCount(2)
     await expect(rows.filter({ hasText: 'binh@example.com' }).getByTestId('student-progress')).toContainText('4/11 · 36%')
 
-    // The filters narrow the totals, both pies and the table together.
+    // The filters narrow the totals, the module pie and the table together.
     await page.getByLabel('Course progress', { exact: true }).selectOption('part-way')
     await expect(page.getByTestId('overview-student-count')).toHaveText('1 of 2 students shown')
     await expect(rows).toHaveCount(1)
-    await expect(progress.getByRole('listitem').filter({ hasText: 'Not started' })).toContainText('0')
+    // The progress pie keeps the other groups and marks the chosen one.
+    await expect(progress.getByRole('listitem').filter({ hasText: 'Not started' })).toContainText('1')
+    await expect(progress.locator('[aria-current="true"]')).toContainText('Part way')
     await expect(page.getByTestId('enrollment-count')).toContainText('2')
     await page.getByLabel('Search students').fill('nobody')
     await expect(page.getByText('No students match these filters.')).toBeVisible()
