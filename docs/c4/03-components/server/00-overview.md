@@ -60,7 +60,9 @@ flowchart LR
   cyber -.->|"type: Agents"| agents
   routes -->|"GET /api/lecturer · handleLecturer"| lecturer
   routes -->|"GET /api/staff/review · handleStaffReview<br/>GET /api/staff/conversation · handleStaffConversation"| staffReview
-  staffReview -->|"defaultCourseId"| course
+  staffReview -->|"defaultCourseId, moduleName"| course
+  staffReview -->|"courseProgress"| shared
+  admin -->|"moduleName"| course
   staffReview -.->|"StaffReviewStore, StaffAccessLog"| storage
   routes -->|"handleStudent"| student
   student -->|"isNoteColour"| shared

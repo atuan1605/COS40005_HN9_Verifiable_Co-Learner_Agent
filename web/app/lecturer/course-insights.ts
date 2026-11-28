@@ -24,6 +24,10 @@ export interface ModuleStatusRow {
   segments: ModuleStatusSegment[]
 }
 
+export function studentCountText(count: number): string {
+  return `${count} ${count === 1 ? 'student' : 'students'}`
+}
+
 // The tab's campus filter; empty is All campuses.
 export function studentsAtCampus(students: readonly LecturerStudent[], campus: Campus | ''): LecturerStudent[] {
   return students.filter(student => campus === '' || student.campus === campus)

@@ -20,7 +20,7 @@ flowchart LR
   convRoute["<b>api/staff/conversation.get.ts</b>"]:::near
   convHandle["<b>staff-review/handle-staff-conversation.ts</b><br/>handleStaffConversation"]:::comp
   access["<b>staff-review/review-access.ts</b><br/>reviewAccess, StaffReviewError"]:::comp
-  summaries["<b>staff-review/conversation-summaries.ts</b><br/>conversationSummaries, moduleName"]:::comp
+  summaries["<b>staff-review/conversation-summaries.ts</b><br/>conversationSummaries"]:::comp
   signals["<b>staff-review/review-signals.ts</b><br/>reviewSignals"]:::comp
   role["<b>staff/staff-role.ts</b><br/>staffRole"]:::near
   course["<b>course/index.ts</b>"]:::near
@@ -39,8 +39,9 @@ flowchart LR
   handle -->|"reviewAccess"| access
   handle -->|"conversationSummaries"| summaries
   convHandle -->|"reviewAccess"| access
-  convHandle -->|"moduleName"| summaries
-  summaries -->|"canonicalModuleId"| course
+  convHandle -->|"moduleName"| course
+  summaries -->|"moduleName"| course
+  handle -->|"moduleName"| course
   convHandle -.->|"type: StaffAccessLog"| accessLog
   convRoute -->|"createSupabase...Store, ...Log"| reviewStore
   convRoute -->|"createSupabaseStaffAccessLog"| accessLog
@@ -71,7 +72,7 @@ flowchart LR
 
 ## Verified imports
 
-- Runtime: `staff/staff-role` (`staffRole`), `student-model` (`moduleStandings`, `needsEvidence`), `shared/course-progress` (`courseProgress`), `course` (`defaultCourseId`, `canonicalModuleId`), `./review-access`, `./conversation-summaries`, `learning-pattern/gather`, `learning-plan` (`planStepTitle`), `./review-signals`.
+- Runtime: `staff/staff-role` (`staffRole`), `student-model` (`moduleStandings`, `needsEvidence`), `shared/course-progress` (`courseProgress`), `course` (`defaultCourseId`, `moduleName`), `./review-access`, `./conversation-summaries`, `learning-pattern/gather`, `learning-plan` (`planStepTitle`), `./review-signals`.
 - Type only: `storage/staff-access-log` (`StaffAccessLog`, `StaffAccessRole`), `storage/staff-review-store` (`StaffReviewStore`, with `learningPlans` and `masteries`), `storage/course-store` (`CourseStore`), `shared/staff-review`.
 - It never imports Supabase code; `api/staff/review.get.ts` and `api/staff/conversation.get.ts` pass the stores in. The administrator reads the log through [`admin`](09-admin.md).
 - Tests: `review-signals.test.ts` (the two signals), `staff-review-handler.test.ts` (who may open, the Course progress and mastery the owning lecturer alone sees, the log written for every opening, the conversation summaries, the one-conversation handler (access rule, log before read, 404s), the log read by an administrator only, with module names) and `staff-access-log-migration.test.ts` (the table is append-only and closed to `anon` and `authenticated`, and keeps a module id for conversation openings only, on PGlite).

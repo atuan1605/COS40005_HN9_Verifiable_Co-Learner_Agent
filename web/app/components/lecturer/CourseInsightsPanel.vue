@@ -3,7 +3,7 @@ import { campuses, type Campus } from '#shared/campus'
 import type { LecturerCourse } from '#shared/lecturer'
 import CourseProgressHistogram from '~/components/lecturer/CourseProgressHistogram.vue'
 import ModuleStatusChart from '~/components/lecturer/ModuleStatusChart.vue'
-import { studentsAtCampus } from '~/lecturer/course-insights'
+import { studentCountText, studentsAtCampus } from '~/lecturer/course-insights'
 
 // The Insights tab: Course insights for each owned course, worked out here from the lecturer
 // response. One campus filter applies to the whole tab and sends no request.
@@ -43,7 +43,7 @@ const views = computed(() => props.courses.map(course => ({
       <p v-else-if="!students.length" class="text-sm text-muted">No students at {{ campus }}.</p>
       <template v-else>
         <p class="text-sm text-muted" data-testid="insights-student-count">
-          {{ students.length }} {{ students.length === 1 ? 'student' : 'students' }} shown
+          {{ studentCountText(students.length) }} shown
         </p>
         <ModuleStatusChart :modules="course.modules" :students="students" />
         <CourseProgressHistogram :students="students" />

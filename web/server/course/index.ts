@@ -4,6 +4,7 @@
 export {
   courseFromSpec,
   defaultCourseId,
+  moduleName,
   presentedRoadmap,
   pythonCourse,
   redirectText,

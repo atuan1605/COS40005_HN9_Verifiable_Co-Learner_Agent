@@ -1,7 +1,7 @@
 import type { StaffConversation } from '../../shared/staff-review'
 import type { StaffAccessLog } from '../storage/staff-access-log'
 import type { CourseStore } from '../storage/course-store'
-import { moduleName } from './conversation-summaries'
+import { moduleName } from '../course'
 import { reviewAccess, StaffReviewError, type ReviewAccessRequest } from './review-access'
 
 export interface StaffConversationRequest extends ReviewAccessRequest {

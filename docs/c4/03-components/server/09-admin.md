@@ -22,10 +22,12 @@ flowchart LR
   settings["<b>storage/model-settings-store.ts</b>"]:::near
   directory["<b>storage/student-directory.ts</b>"]:::near
   accessLog["<b>storage/staff-access-log.ts</b>"]:::near
+  course["<b>course/index.ts</b>"]:::near
 
   route -->|"handleAdmin, handleConnectionTest,<br/>isRoleCheck, isConnectionTest and error classes"| handle
   handle -->|"resolveModelChoice,<br/>testConnection, UnusableSettingsError"| choice
   handle -->|"verifyShieldEnabled"| shield
+  handle -->|"moduleName"| course
   handle -.->|"type: ConnectionReport, DecisionLogStore"| decisionLog
   handle -.->|"type: ModelSettingsStore"| settings
   handle -.->|"type: StudentDirectoryStore"| directory
@@ -48,7 +50,7 @@ flowchart LR
 
 ## Verified imports
 
-- Runtime: `language-model` (`resolveModelChoice`, `modelAddressLocked`, `testConnection`, `UnusableSettingsError`; types `ModelSettings`, `ConnectionReport`), `verify-shield` (`verifyShieldEnabled`; type `VerifyShieldStore`), `shared/student-number` (`isStudentNumber`, `studentNumberRule`).
+- Runtime: `language-model` (`resolveModelChoice`, `modelAddressLocked`, `testConnection`, `UnusableSettingsError`; types `ModelSettings`, `ConnectionReport`), `verify-shield` (`verifyShieldEnabled`; type `VerifyShieldStore`), `course` (`moduleName`), `shared/student-number` (`isStudentNumber`, `studentNumberRule`).
 - Type only: `storage/decision-log`, `storage/model-settings-store`, `storage/student-directory` (`StudentDirectoryStore`, `AdminStudent`), `storage/staff-access-log` (`StaffAccessLog`, `StaffAccessRow`), `storage/course-store` (`CourseStore`), `shared/staff-review` (`StaffAccessEntry`).
 - It never imports Supabase code; the route passes the stores in, including the student directory.
 - Each decision it returns includes `ruleChecks` when the decision log recorded them.

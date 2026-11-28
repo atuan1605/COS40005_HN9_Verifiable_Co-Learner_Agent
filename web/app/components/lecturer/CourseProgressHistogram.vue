@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { LecturerStudent } from '#shared/lecturer'
-import { progressBands, type ProgressBand } from '~/lecturer/course-insights'
+import StudentListPanel from '~/components/lecturer/StudentListPanel.vue'
+import { progressBands, studentCountText, type ProgressBand } from '~/lecturer/course-insights'
 
 // A histogram of the students shown by Course progress, one column per percentage band.
 const props = defineProps<{
@@ -29,21 +30,16 @@ const columns = computed(() => {
 // links can be reached.
 const shown = ref<string | null>(null)
 const listed = computed(() => bands.value.find(band => band.label === shown.value && band.students.length > 0))
-const list = useTemplateRef<HTMLUListElement>('list')
-const id = useId()
+const panel = useTemplateRef<InstanceType<typeof StudentListPanel>>('panel')
 
 async function enter(label: string) {
   shown.value = label
   await nextTick()
-  list.value?.querySelector('a')?.focus()
-}
-
-function countText(count: number) {
-  return `${count} ${count === 1 ? 'student' : 'students'}`
+  panel.value?.focusFirst()
 }
 
 function bandLabel(band: ProgressBand) {
-  return `Course progress ${band.label}: ${countText(band.students.length)}`
+  return `Course progress ${band.label}: ${studentCountText(band.students.length)}`
 }
 </script>
 
@@ -98,24 +94,14 @@ function bandLabel(band: ProgressBand) {
       </template>
     </svg>
 
-    <div v-if="listed" class="rounded-sm border border-default bg-muted p-3" data-testid="progress-distribution-students">
-      <div class="flex items-start justify-between gap-3">
-        <p :id="`${id}-students`" class="text-sm font-medium text-highlighted" aria-live="polite">{{ bandLabel(listed) }}</p>
-        <button type="button" class="min-h-11 text-sm text-muted underline underline-offset-4 md:min-h-0" @click="shown = null">
-          Close
-        </button>
-      </div>
-      <ul ref="list" class="flex max-h-72 flex-col overflow-y-auto md:gap-1" :aria-labelledby="`${id}-students`">
-        <li v-for="student in listed.students" :key="student.studentNumber">
-          <NuxtLink
-            :to="`/review/${student.studentNumber}`"
-            class="inline-flex min-h-11 items-center gap-2 text-sm text-brand-700 underline underline-offset-4 [overflow-wrap:anywhere] md:min-h-0"
-          >
-            {{ student.displayName }} ({{ student.studentNumber }})
-          </NuxtLink>
-        </li>
-      </ul>
-    </div>
+    <StudentListPanel
+      v-if="listed"
+      ref="panel"
+      :title="bandLabel(listed)"
+      :students="listed.students"
+      data-testid="progress-distribution-students"
+      @close="shown = null"
+    />
 
     <details class="text-sm text-default">
       <summary class="min-h-11 cursor-pointer content-center text-brand-700 md:min-h-0">Course progress counts as a table</summary>

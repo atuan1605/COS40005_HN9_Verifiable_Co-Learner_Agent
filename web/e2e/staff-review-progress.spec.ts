@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { demoAccounts, lecturerAccount, productOwnerAccount } from '../server/auth/demo-accounts'
-import { resetDemoAccounts, studentNumberOf } from './reset-demo-accounts'
+import { recordedUnlocksOf, resetDemoAccounts, studentNumberOf } from './reset-demo-accounts'
 
 // The Course progress section on the staff review, at desktop and phone width:
 // the heading, the x/total figure and the Unlocked and Closed capsules.
@@ -10,6 +10,9 @@ const widths = [
   { name: 'phone', viewport: { width: 390, height: 844 } },
 ] as const
 
+// The modules of the Python course that have content; only these can be unlocked.
+const withContent = ['getting_started', 'variables', 'strings', 'conditionals', 'loops']
+
 test.beforeAll(async () => {
   await resetDemoAccounts()
 })
@@ -17,7 +20,10 @@ test.beforeAll(async () => {
 for (const width of widths) {
   test(`shows Course progress with a capsule for each module at ${width.name} width`, async ({ page }) => {
     await page.setViewportSize(width.viewport)
-    // An has no evidence, so only the first module is open.
+    // The reset leaves An no evidence and no stored mastery, so nothing is mastered. The first
+    // module is open, and so is any module an earlier run recorded as unlocked.
+    const recorded = await recordedUnlocksOf(demoAccounts[0].email)
+    const unlocked = withContent.filter((id, index) => index === 0 || recorded.includes(id)).length
     const studentNumber = await studentNumberOf(demoAccounts[0].email)
     await signIn(page, lecturerAccount)
     await expect(page).toHaveURL(/\/lecturer$/)
@@ -29,8 +35,8 @@ for (const width of widths) {
     await expect(section.getByText('0/11 · 0%')).toBeVisible()
     await expect(section.getByRole('progressbar', { name: 'Course progress' })).toHaveAttribute('aria-valuenow', '0')
     await expect(section.getByRole('listitem')).toHaveCount(11)
-    await expect(section.getByText('Unlocked', { exact: true })).toHaveCount(1)
-    await expect(section.getByText('Closed', { exact: true })).toHaveCount(10)
+    await expect(section.getByText('Unlocked', { exact: true })).toHaveCount(unlocked)
+    await expect(section.getByText('Closed', { exact: true })).toHaveCount(11 - unlocked)
     await expect(section.getByRole('listitem').first()).toContainText('Unlocked')
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)

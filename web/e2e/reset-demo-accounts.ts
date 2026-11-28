@@ -64,6 +64,10 @@ export async function resetDemoAccounts() {
   // mastery the next run starts from. The seeded ledger is left as it is.
   const evidence = await admin.from('evidence').delete().in('student_id', clearableIds(students))
   if (evidence.error) throw new Error(evidence.error.message)
+  // Stored mastery would outlive the evidence it came from. Without it, mastery is estimated
+  // again from what is left of the ledger. Recorded unlocks are permanent (ADR 0005) and stay.
+  const masteries = await admin.from('module_masteries').delete().in('student_id', ids)
+  if (masteries.error) throw new Error(masteries.error.message)
   // Each rehearsal starts with Mai switched on, and with the day's 60 turns unused.
   const deskmate = await admin.from('deskmate_settings').delete().in('student_id', ids)
   if (deskmate.error) throw new Error(deskmate.error.message)
@@ -92,6 +96,15 @@ export async function studentNumberOf(email: string): Promise<string> {
   const number = found.data.student_number as string | null
   if (!number) throw new Error(`Demo account ${email} has no student number.`)
   return number
+}
+
+// The modules recorded as unlocked for a demo student, which an earlier run may have added to.
+export async function recordedUnlocksOf(email: string): Promise<string[]> {
+  const admin = adminClient()
+  const found = await admin.from('module_unlocks').select('module_id')
+    .eq('student_id', await demoStudentIdByEmail(admin, email)).eq('course_id', 'intro_python')
+  if (found.error) throw new Error(found.error.message)
+  return found.data.map(row => row.module_id as string)
 }
 
 export async function clearDemoCampus(email: string) {
