@@ -5,6 +5,8 @@ import type { StaffReviewStore } from './staff-review-store'
 
 // The most activity read for one student, so a very long history cannot make one opening unbounded.
 const activityReadLimit = 5000
+// One page of messages; PostgREST returns at most 1000 rows a request.
+const messagePageSize = 500
 
 export function createSupabaseStaffReviewStore({ url, secretKey }: { url: string, secretKey: string }): StaffReviewStore {
   const supabase = createClient(url, secretKey, {
@@ -97,19 +99,23 @@ export function createSupabaseStaffReviewStore({ url, secretKey }: { url: string
       if (result.error) throw new Error(result.error.message)
       return result.data.map(row => row.module_id)
     },
-    async conversations(studentId, courseId) {
-      const conversations = await supabase.from('conversations').select('id, module_id')
-        .eq('student_id', studentId).eq('course_id', courseId).order('module_id')
+    async hasConversation(studentId, courseId, moduleId) {
+      const result = await supabase.from('conversations').select('id')
+        .eq('student_id', studentId).eq('course_id', courseId).eq('module_id', moduleId).limit(1)
+      if (result.error) throw new Error(result.error.message)
+      return result.data.length > 0
+    },
+    async conversations(studentId, courseId, moduleId) {
+      let query = supabase.from('conversations').select('id, module_id')
+        .eq('student_id', studentId).eq('course_id', courseId)
+      if (moduleId !== undefined) query = query.eq('module_id', moduleId)
+      const conversations = await query.order('module_id')
       if (conversations.error) throw new Error(conversations.error.message)
       if (conversations.data.length === 0) return []
-      const messages = await supabase.from('messages')
-        .select('id, conversation_id, sequence, author, text, exercise_id, created_at')
-        .in('conversation_id', conversations.data.map(conversation => conversation.id))
-        .order('sequence', { ascending: true })
-      if (messages.error) throw new Error(messages.error.message)
+      const messages = await messagesOf(conversations.data.map(conversation => conversation.id))
       return conversations.data.map(conversation => ({
         moduleId: conversation.module_id,
-        messages: messages.data
+        messages: messages
           .filter(message => message.conversation_id === conversation.id)
           .map(message => ({
             id: message.id,
@@ -121,5 +127,21 @@ export function createSupabaseStaffReviewStore({ url, secretKey }: { url: string
           })),
       }))
     },
+  }
+
+  // Page by page, so a long history is neither cut short nor miscounted.
+  async function messagesOf(conversationIds: string[]) {
+    const read = []
+    for (let offset = 0; ; offset += messagePageSize) {
+      const result = await supabase.from('messages')
+        .select('id, conversation_id, sequence, author, text, exercise_id, created_at')
+        .in('conversation_id', conversationIds)
+        .order('sequence', { ascending: true })
+        .order('id', { ascending: true })
+        .range(offset, offset + messagePageSize - 1)
+      if (result.error) throw new Error(result.error.message)
+      read.push(...result.data)
+      if (result.data.length < messagePageSize) return read
+    }
   }
 }

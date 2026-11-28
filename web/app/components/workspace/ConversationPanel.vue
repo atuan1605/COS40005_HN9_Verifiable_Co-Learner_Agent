@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ConversationMessage, Quote, TurnTrace } from '#shared/turn'
 import { addresseeName, addressMenu, chooseAddressee, type AddressedAgent } from '~/workspace/addressed-agent'
+import { bubbleClass, eventClass, nameClass, portraitClass, portraitSrc } from '~/workspace/chat-style'
 import { dateMessages } from '~/workspace/conversation-dates'
 import BusySpinner from '../BusySpinner.vue'
 import ChatMarkdown from './ChatMarkdown.vue'
@@ -63,30 +64,6 @@ interface EventRow {
   day: string | null
   time: string | null
 }
-
-const bubbleClass = {
-  student: 'rounded-tl-2xl rounded-tr-[2px] rounded-br-2xl rounded-bl-2xl bg-self px-[14px] py-[10px] text-on-self shadow-[0px_1px_1px_rgba(0,0,0,0.05)]',
-  teacher: 'rounded-tl-[2px] rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border border-brand-200/80 bg-brand-50 px-[15px] py-[11px] text-brand-950',
-  deskmate: 'rounded-tl-[2px] rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border border-amber-200/80 bg-amber-50 px-[15px] py-[11px] text-amber-950',
-} as const
-
-const portraitSrc = {
-  student: '/portraits/student.png',
-  teacher: '/portraits/teacher.png',
-  deskmate: '/portraits/deskmate.png',
-} as const
-
-const portraitClass = {
-  student: 'border-ink-300 bg-ink-100 shadow-[-2px_2px_0_0_var(--color-ink-400)]',
-  teacher: 'border-brand-200 bg-brand-50 shadow-[2px_2px_0_0_var(--color-brand-300)]',
-  deskmate: 'border-amber-200 bg-amber-50 shadow-[2px_2px_0_0_var(--color-amber-300)]',
-} as const
-
-const nameClass = {
-  student: 'text-on-self',
-  teacher: 'text-brand-900',
-  deskmate: 'text-amber-950',
-} as const
 
 const roleClass = {
   student: 'text-on-self/70',
@@ -410,7 +387,7 @@ watch(() => props.sending, (sending) => {
         >
           <p
             v-if="row.kind === 'event'"
-            class="rounded-full bg-ink-100 px-2.5 py-0.5 text-center font-mono text-[10px] leading-[15px] text-ink-500"
+            :class="eventClass"
           >
             {{ row.name }} · {{ row.text }}<template v-if="row.time">
               · <time data-message-time>{{ row.time }}</time></template>

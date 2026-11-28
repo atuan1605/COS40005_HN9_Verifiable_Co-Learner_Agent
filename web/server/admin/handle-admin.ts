@@ -1,7 +1,8 @@
 import { modelAddressLocked, resolveModelChoice, testConnection, UnusableSettingsError, type ConnectionReport, type ModelSettings } from '../language-model'
 import type { DecisionChain, DecisionLogStore, DecisionQuery, DecisionRecord } from '../storage/decision-log'
 import type { ModelSettingsStore } from '../storage/model-settings-store'
-import type { StaffAccessLog } from '../storage/staff-access-log'
+import type { StaffAccessLog, StaffAccessRow } from '../storage/staff-access-log'
+import type { CourseStore } from '../storage/course-store'
 import type { AdminStudent, StudentDirectoryStore } from '../storage/student-directory'
 import type { StaffAccessEntry } from '../../shared/staff-review'
 import { verifyShieldEnabled, type VerifyShieldStore } from '../verify-shield'
@@ -72,6 +73,8 @@ export interface AdminRequest {
   students?: StudentDirectoryStore
   // Who opened which student's records. Only an administrator reads it (ADR 0009).
   accessLog?: StaffAccessLog
+  // Names the module of each conversation the access log says was opened.
+  courses?: CourseStore
   // Set by tests. A production server leaves it unset and the address stays locked.
   production?: boolean
   body: unknown
@@ -177,7 +180,9 @@ export async function handleAdmin(request: AdminRequest): Promise<AdminResponse>
     decisions: request.decisions ? await request.decisions.list(decisionQuery(request.body)) : [],
     chain: request.decisions ? await request.decisions.chain() : 'verified',
     students: wantsDirectory(request.body) && request.students ? await request.students.list() : [],
-    staffAccess: wantsStaffAccess(request.body) && request.accessLog ? await request.accessLog.list(staffAccessShown) : [],
+    staffAccess: wantsStaffAccess(request.body) && request.accessLog
+      ? await withModuleNames(await request.accessLog.list(staffAccessShown), request.courses)
+      : [],
   }
 }
 
@@ -193,6 +198,17 @@ function wantsStaffAccess(body: unknown): boolean {
 }
 
 const staffAccessShown = 200
+
+// Each opening with the name of the module it showed; its id when the course no longer lists it.
+async function withModuleNames(rows: StaffAccessRow[], courses: CourseStore | undefined): Promise<StaffAccessEntry[]> {
+  const courseIds = [...new Set(rows.flatMap(row => row.moduleId && row.courseId ? [row.courseId] : []))]
+  const read = courses ? await Promise.all(courseIds.map(id => courses.course(id))) : []
+  return rows.map((row) => {
+    if (!row.moduleId) return { ...row, moduleName: null }
+    const module = read.find(course => course.id === row.courseId)?.modules.find(candidate => candidate.id === row.moduleId)
+    return { ...row, moduleName: module?.name ?? row.moduleId }
+  })
+}
 
 // The administrator may correct a number to SWB followed by at least four
 // digits. Whether the number is free is the store's decision.

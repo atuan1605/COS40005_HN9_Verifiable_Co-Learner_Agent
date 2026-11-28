@@ -12,6 +12,7 @@ import {
   SignInRequiredError,
 } from '../admin/handle-admin'
 import { defaultCourseId } from '../course'
+import { createSupabaseCourseStore } from '../storage/supabase-course-store'
 import { createSupabaseDecisionLogStore } from '../storage/supabase-decision-log'
 import { createSupabaseStaffAccessLog } from '../storage/supabase-staff-access-log'
 import { createSupabaseModelSettingsStore } from '../storage/supabase-model-settings-store'
@@ -44,6 +45,7 @@ export default defineEventHandler(async (event) => {
       verifyShieldEnv: config.verifyShield,
       students: createSupabaseStudentDirectoryStore(connection),
       accessLog: createSupabaseStaffAccessLog(connection),
+      courses: createSupabaseCourseStore(connection),
       body,
     }
     if (isConnectionTest(body)) return await handleConnectionTest(request)
