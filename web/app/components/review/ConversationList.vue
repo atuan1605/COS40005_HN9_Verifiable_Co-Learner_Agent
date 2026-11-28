@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import type { ReviewConversationSummary } from '#shared/staff-review'
+import { timeText } from '~/staff/time-text'
 
 // The student's conversations, one collapsed row per module; each row opens the conversation's own page.
 defineProps<{
   studentNumber: string
   conversations: ReviewConversationSummary[]
 }>()
-
-const dateTime = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })
 </script>
 
 <template>
@@ -26,8 +25,7 @@ const dateTime = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle:
         >
           <span class="min-w-0 flex-1 font-medium text-brand-700 [overflow-wrap:anywhere]">{{ conversation.moduleName }}</span>
           <span class="text-muted">{{ conversation.messageCount }} {{ conversation.messageCount === 1 ? 'message' : 'messages' }}</span>
-          <time v-if="conversation.latestAt" :datetime="conversation.latestAt" class="text-xs text-muted">{{ dateTime.format(new Date(conversation.latestAt)) }}</time>
-          <span v-else class="text-xs text-muted">Before times were kept</span>
+          <time :datetime="conversation.latestAt ?? undefined" class="text-xs text-muted">{{ timeText(conversation.latestAt) }}</time>
         </NuxtLink>
       </li>
     </ul>

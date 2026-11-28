@@ -40,11 +40,11 @@ function setup(extra: Partial<MemoryStaffReviewData> = {}) {
         ? { moduleId: module.id, mastery: 0.97, passedExercise: true, everMastered: true }
         : { moduleId: module.id, mastery: module.id === 'variables' ? 0.4 : 0, passedExercise: false, everMastered: false }),
     },
+    learningPlans: { 'an-id': plans },
     conversations: {
       'an-id': [{ moduleId: 'loops', messages: [{ id: 'm1', sequence: 1, author: 'student', text: 'hi', exerciseId: 'sum', time: null }] }],
     },
     ...extra,
-    learningPlans: { 'an-id': plans },
     submissions: {
       'an-id': [{
         id: 's1',
@@ -348,6 +348,17 @@ describe('the plan and the pattern a review shows', () => {
     expect(plan!.moduleId).toBe('loops')
     expect(plan!.revisions.map(revision => [revision.revision, revision.agreedAt !== null])).toEqual([[1, false], [2, true]])
     expect(plan!.revisions[0]!.steps.map(step => step.title)).toEqual(['Read the module materials', 'quiz gone'])
+  })
+
+  it('names each plan\'s module, and falls back to the id of a module the course no longer has', async () => {
+    const dropped: LearningPlan = { ...plans[0]!, moduleId: 'turtle_graphics' }
+
+    const review = await open('lecturer@example.com', 'SWB0001', setup({ learningPlans: { 'an-id': [...plans, dropped] } })).result
+
+    expect(review.plans.map(plan => [plan.moduleId, plan.moduleName])).toEqual([
+      ['loops', 'Loops'],
+      ['turtle_graphics', 'turtle_graphics'],
+    ])
   })
 
   it('shows the whole learning pattern, not only the weak spots the student sees', async () => {
