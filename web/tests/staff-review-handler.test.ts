@@ -378,6 +378,14 @@ describe('the plan and the pattern a review shows', () => {
     ])
   })
 
+  it('names a plan stored under the legacy for_loop id', async () => {
+    const legacy: LearningPlan = { ...plans[0]!, moduleId: 'for_loop' }
+
+    const review = await open('lecturer@example.com', 'SWB0001', setup({ learningPlans: { 'an-id': [legacy] } })).result
+
+    expect(review.plans.map(plan => [plan.moduleId, plan.moduleName])).toEqual([['for_loop', 'Loops']])
+  })
+
   it('shows the whole learning pattern, not only the weak spots the student sees', async () => {
     const parts = setup()
     await parts.submissions.record({ studentId: 'an-id', moduleId: 'loops', exerciseId: 'sum', code: 'x', results: [], outcome: 'failed', message: null, findings: ['off_by_one'] })
@@ -470,6 +478,15 @@ describe('reading the staff access log', () => {
       ['student_conversation', 'Loops'],
       ['student_review', null],
     ])
+  })
+
+  it('names a conversation opened under the legacy for_loop id', async () => {
+    const parts = setup({ conversations: { 'an-id': [{ moduleId: 'for_loop', messages: [] }] } })
+    await openConversation('lecturer@example.com', 'SWB0001', 'for_loop', parts).result
+
+    const answer = await read('owner@example.com', parts.accessLog)
+
+    expect(answer.staffAccess.map(entry => entry.moduleName)).toEqual(['Loops'])
   })
 
   it.each(['lecturer@example.com', 'an@example.com'])('refuses %s', async (email) => {

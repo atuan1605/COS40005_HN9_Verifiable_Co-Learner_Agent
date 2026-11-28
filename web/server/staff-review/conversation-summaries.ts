@@ -1,11 +1,6 @@
 import type { ReviewConversationSummary } from '../../shared/staff-review'
 import type { ReviewConversation } from '../storage/staff-review-store'
-import { canonicalModuleId, type Course } from '../course'
-
-// The module's name; its id when the course no longer lists it.
-export function moduleName(course: Course, moduleId: string): string {
-  return course.modules.find(module => module.id === canonicalModuleId(moduleId))?.name ?? moduleId
-}
+import { moduleName, type Course } from '../course'
 
 // One row per conversation, without its messages, the latest talked in first.
 export function conversationSummaries(conversations: readonly ReviewConversation[], course: Course): ReviewConversationSummary[] {

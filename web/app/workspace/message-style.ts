@@ -1,4 +1,4 @@
-// How a chat message looks, by author: shared by the student's conversation panel and the
+// How a message looks, by author: shared by the student's conversation panel and the
 // staff conversation page, so staff read a conversation as the student saw it.
 
 export const bubbleClass = {

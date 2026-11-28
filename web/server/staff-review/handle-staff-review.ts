@@ -3,7 +3,7 @@ import type { ReviewEvent, ReviewMastery, ReviewPlan, StaffReview } from '../../
 import { moduleStandings, needsEvidence, type TimedObservation } from '../student-model'
 import type { StaffAccessLog } from '../storage/staff-access-log'
 import type { StaffReviewStore } from '../storage/staff-review-store'
-import type { Course } from '../course'
+import { moduleName, type Course } from '../course'
 import { gatherLearningPattern, type LearningPatternSources } from '../learning-pattern/gather'
 import { planStepTitle, type LearningPlan } from '../learning-plan'
 import type { CourseStore } from '../storage/course-store'
@@ -83,7 +83,7 @@ function reviewPlans(revisions: readonly LearningPlan[], course: Course): Review
     const module = course.studyModules.find(candidate => candidate.id === plan.moduleId)
     const entry = byModule.get(plan.moduleId) ?? {
       moduleId: plan.moduleId,
-      moduleName: course.modules.find(candidate => candidate.id === plan.moduleId)?.name ?? plan.moduleId,
+      moduleName: moduleName(course, plan.moduleId),
       revisions: [],
     }
     entry.revisions.push({

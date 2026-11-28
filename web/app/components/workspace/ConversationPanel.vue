@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ConversationMessage, Quote, TurnTrace } from '#shared/turn'
 import { addresseeName, addressMenu, chooseAddressee, type AddressedAgent } from '~/workspace/addressed-agent'
-import { bubbleClass, eventClass, nameClass, portraitClass, portraitSrc } from '~/workspace/chat-style'
+import { bubbleClass, eventClass, nameClass, portraitClass, portraitSrc } from '~/workspace/message-style'
 import { dateMessages } from '~/workspace/conversation-dates'
 import BusySpinner from '../BusySpinner.vue'
 import ChatMarkdown from './ChatMarkdown.vue'

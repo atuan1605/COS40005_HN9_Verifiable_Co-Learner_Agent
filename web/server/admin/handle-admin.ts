@@ -3,6 +3,7 @@ import type { DecisionChain, DecisionLogStore, DecisionQuery, DecisionRecord } f
 import type { ModelSettingsStore } from '../storage/model-settings-store'
 import type { StaffAccessLog, StaffAccessRow } from '../storage/staff-access-log'
 import type { CourseStore } from '../storage/course-store'
+import { moduleName } from '../course'
 import type { AdminStudent, StudentDirectoryStore } from '../storage/student-directory'
 import type { StaffAccessEntry } from '../../shared/staff-review'
 import { verifyShieldEnabled, type VerifyShieldStore } from '../verify-shield'
@@ -202,12 +203,11 @@ const staffAccessShown = 200
 // Each opening with the name of the module it showed; its id when the course no longer lists it.
 async function withModuleNames(rows: StaffAccessRow[], courses: CourseStore | undefined): Promise<StaffAccessEntry[]> {
   const courseIds = [...new Set(rows.flatMap(row => row.moduleId && row.courseId ? [row.courseId] : []))]
-  const read = courses ? await Promise.all(courseIds.map(id => courses.course(id))) : []
-  return rows.map((row) => {
-    if (!row.moduleId) return { ...row, moduleName: null }
-    const module = read.find(course => course.id === row.courseId)?.modules.find(candidate => candidate.id === row.moduleId)
-    return { ...row, moduleName: module?.name ?? row.moduleId }
-  })
+  const studied = courses ? await Promise.all(courseIds.map(id => courses.course(id))) : []
+  return rows.map(row => ({
+    ...row,
+    moduleName: row.moduleId ? moduleName(studied.find(course => course.id === row.courseId), row.moduleId) : null,
+  }))
 }
 
 // The administrator may correct a number to SWB followed by at least four

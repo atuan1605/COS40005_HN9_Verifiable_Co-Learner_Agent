@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { LecturerCourse, LecturerStudent } from '#shared/lecturer'
 import type { ModuleState } from '#shared/turn'
-import { moduleStatus, moduleStatusOrder, type ModuleStatusRow, type ModuleStatusSegment } from '~/lecturer/course-insights'
+import StudentListPanel from '~/components/lecturer/StudentListPanel.vue'
+import { moduleStatus, moduleStatusOrder, studentCountText, type ModuleStatusRow, type ModuleStatusSegment } from '~/lecturer/course-insights'
 
 // A stacked bar per module of how many of the students shown have it mastered, open or closed.
 const props = defineProps<{
@@ -22,14 +23,12 @@ const states: Record<ModuleState, { label: string, fill: string, swatch: string 
 interface Mark { moduleId: string, state: ModuleState }
 const pointed = ref<Mark | null>(null)
 const selected = ref<Mark | null>(null)
-const id = useId()
-
-function is(mark: Mark | null, moduleId: string, state: ModuleState) {
+function isSameMark(mark: Mark | null, moduleId: string, state: ModuleState) {
   return mark?.moduleId === moduleId && mark.state === state
 }
 
 function toggle(moduleId: string, state: ModuleState) {
-  selected.value = is(selected.value, moduleId, state) ? null : { moduleId, state }
+  selected.value = isSameMark(selected.value, moduleId, state) ? null : { moduleId, state }
 }
 
 // The segment under the pointer or focus, or the one whose students are listed, if the module
@@ -39,16 +38,19 @@ function segmentOf(row: ModuleStatusRow, mark: Mark | null): ModuleStatusSegment
   return row.segments.find(segment => segment.state === mark.state && segment.students.length > 0)
 }
 
+// Each row with its pointed-at and listed segments.
+const marked = computed(() => rows.value.map(row => ({
+  ...row,
+  pointedSegment: segmentOf(row, pointed.value),
+  selectedSegment: segmentOf(row, selected.value),
+})))
+
 function middle(segment: ModuleStatusSegment) {
   return segment.start + segment.width / 2
 }
 
-function countText(count: number) {
-  return `${count} ${count === 1 ? 'student' : 'students'}`
-}
-
 function markLabel(row: ModuleStatusRow, segment: ModuleStatusSegment) {
-  return `${row.name}, ${states[segment.state].label}: ${countText(segment.students.length)}`
+  return `${row.name}, ${states[segment.state].label}: ${studentCountText(segment.students.length)}`
 }
 </script>
 
@@ -65,7 +67,7 @@ function markLabel(row: ModuleStatusRow, segment: ModuleStatusSegment) {
     </div>
 
     <ul class="flex flex-col gap-3">
-      <li v-for="row in rows" :key="row.moduleId" class="flex flex-col gap-1 md:grid md:grid-cols-[16rem_1fr] md:items-center md:gap-x-4">
+      <li v-for="row in marked" :key="row.moduleId" class="flex flex-col gap-1 md:grid md:grid-cols-[16rem_1fr] md:items-center md:gap-x-4">
         <p class="text-sm text-default [overflow-wrap:anywhere]">{{ row.name }}</p>
         <div class="relative" @keydown.esc="pointed = null">
           <svg width="100%" height="24" class="block overflow-visible" role="group" :aria-label="`${row.name} module status`">
@@ -76,7 +78,7 @@ function markLabel(row: ModuleStatusRow, segment: ModuleStatusSegment) {
                 tabindex="0"
                 class="group cursor-pointer outline-none"
                 :aria-label="markLabel(row, segment)"
-                :aria-expanded="is(selected, row.moduleId, segment.state)"
+                :aria-expanded="isSameMark(selected, row.moduleId, segment.state)"
                 @pointerenter="pointed = { moduleId: row.moduleId, state: segment.state }"
                 @pointerleave="pointed = null"
                 @focus="pointed = { moduleId: row.moduleId, state: segment.state }"
@@ -102,10 +104,10 @@ function markLabel(row: ModuleStatusRow, segment: ModuleStatusSegment) {
           </svg>
           <!-- Shifted by its own width in step with its position, so it never leaves the bar's row. -->
           <div
-            v-if="segmentOf(row, pointed)"
+            v-if="row.pointedSegment"
             role="tooltip"
             class="pointer-events-none absolute bottom-full z-10 mb-1 w-max max-w-full rounded-sm border border-default bg-default px-3 py-2 text-xs shadow-md"
-            :style="{ left: `${middle(segmentOf(row, pointed)!)}%`, transform: `translateX(-${middle(segmentOf(row, pointed)!)}%)` }"
+            :style="{ left: `${middle(row.pointedSegment)}%`, transform: `translateX(-${middle(row.pointedSegment)}%)` }"
           >
             <p class="font-medium text-highlighted">{{ row.name }}</p>
             <p v-for="segment in row.segments" :key="segment.state" class="flex items-center gap-1.5" :class="segment.state === pointed?.state ? 'text-highlighted' : 'text-muted'">
@@ -116,30 +118,14 @@ function markLabel(row: ModuleStatusRow, segment: ModuleStatusSegment) {
           </div>
         </div>
 
-        <div
-          v-if="segmentOf(row, selected)"
-          class="rounded-sm border border-default bg-muted p-3 md:col-start-2"
+        <StudentListPanel
+          v-if="row.selectedSegment"
+          :title="markLabel(row, row.selectedSegment)"
+          :students="row.selectedSegment.students"
+          class="md:col-start-2"
           data-testid="module-status-students"
-        >
-          <div class="flex items-start justify-between gap-3">
-            <p :id="`${id}-${row.moduleId}`" class="text-sm font-medium text-highlighted">
-              {{ markLabel(row, segmentOf(row, selected)!) }}
-            </p>
-            <button type="button" class="min-h-11 text-sm text-muted underline underline-offset-4 md:min-h-0" @click="selected = null">
-              Close
-            </button>
-          </div>
-          <ul class="flex max-h-72 flex-col overflow-y-auto md:gap-1" :aria-labelledby="`${id}-${row.moduleId}`">
-            <li v-for="student in segmentOf(row, selected)!.students" :key="student.studentNumber">
-              <NuxtLink
-                :to="`/review/${student.studentNumber}`"
-                class="inline-flex min-h-11 items-center gap-2 text-sm text-brand-700 underline underline-offset-4 [overflow-wrap:anywhere] md:min-h-0"
-              >
-                {{ student.displayName }} ({{ student.studentNumber }})
-              </NuxtLink>
-            </li>
-          </ul>
-        </div>
+          @close="selected = null"
+        />
       </li>
     </ul>
 

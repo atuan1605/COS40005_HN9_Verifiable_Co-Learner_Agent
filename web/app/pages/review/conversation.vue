@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import type { ReviewMessage, StaffConversation } from '#shared/staff-review'
+import type { StaffConversation } from '#shared/staff-review'
+import { agentNames } from '#shared/turn'
 import ChatMarkdown from '~/components/workspace/ChatMarkdown.vue'
-import { bubbleClass, eventClass, nameClass, portraitClass, portraitSrc } from '~/workspace/chat-style'
+import { bubbleClass, eventClass, nameClass, portraitClass, portraitSrc } from '~/workspace/message-style'
 import { dateMessages } from '~/workspace/conversation-dates'
 
 // The path is set here, not by the file name: a `[studentNumber]/` folder beside
@@ -24,8 +25,6 @@ const { data, error } = await useFetch<StaffConversation>('/api/staff/conversati
 const refused = computed(() => error.value?.statusCode === 403 || error.value?.statusCode === 401)
 const missing = computed(() => error.value?.statusCode === 404)
 const unavailable = computed(() => Boolean(error.value) && !refused.value && !missing.value)
-
-const speakers: Record<Exclude<ReviewMessage['author'], 'student' | 'event'>, string> = { teacher: 'Teacher', deskmate: 'Mai' }
 
 // Days and times are in UTC, as on the review page, so the server and the browser draw the same text.
 const rows = computed(() => {
@@ -90,7 +89,7 @@ const rows = computed(() => {
                 <article class="w-fit max-w-full min-w-0 text-[13px] leading-5 break-words" :class="bubbleClass[row.author]">
                   <p class="mb-0.5 flex items-baseline gap-1.5">
                     <span class="text-[12px] leading-4 font-semibold" :class="nameClass[row.author]">
-                      {{ row.author === 'student' ? data.student.displayName : speakers[row.author] }}
+                      {{ row.author === 'student' ? data.student.displayName : agentNames[row.author] }}
                     </span>
                     <time v-if="row.sentAt" :datetime="row.sentAt" class="ml-auto pl-2 font-mono text-[10px] leading-4 opacity-60">{{ row.time }}</time>
                   </p>
